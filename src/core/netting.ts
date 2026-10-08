@@ -71,9 +71,8 @@ export interface CylinderArgs {
 
 export function cylinderCheck(plan: LayupPlan, a: CylinderArgs): CylinderResult {
   const rows: CylinderRow[] = []
-  const spiral = [...plan.spiral]
-    .filter((g) => g.layers > 0 && g.angle > 0 && g.angle < 90)
-    .sort((x, y) => x.angle - y.angle)
+  // 数组顺序 = 用户给定的缠绕先后顺序，不在此处重排（求和量与顺序无关，但图面与工艺真实性相关）
+  const spiral = plan.spiral.filter((g) => g.layers > 0 && g.angle > 0 && g.angle < 90)
 
   let pa = 0
   let pth = 0

@@ -8,7 +8,8 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
   const { input, setPlan, result } = store
   const cy = result.cylinder
   const pb = result.derived.pb
-  const spiral = [...input.plan.spiral].sort((a, b) => a.angle - b.angle)
+  // 数组顺序即用户给定的缠绕先后（默认按角度升序载入，可上下调序）
+  const spiral = input.plan.spiral
 
   const setLayers = (angle: number, layers: number) => {
     const next = spiral
@@ -18,13 +19,25 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
   }
   const removeGroup = (angle: number) =>
     setPlan({ spiral: spiral.filter((g) => g.angle !== angle), hoop: input.plan.hoop })
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir
+    if (j < 0 || j >= spiral.length) return
+    const next = [...spiral]
+    ;[next[idx], next[j]] = [next[j], next[idx]]
+    setPlan({ spiral: next, hoop: input.plan.hoop })
+  }
   const addGroup = () => {
     const v = window.prompt('新增角度组的缠绕角（度）与层数，例如 "50 2"', '50 2')
     if (v === null) return
     const [a, l] = v.split(/[\s,]+/).map(Number)
     if (!Number.isFinite(a) || a <= 0 || a >= 90) return
     if (spiral.some((g) => Math.abs(g.angle - a) < 1e-9)) return
-    setPlan({ spiral: [...spiral, { angle: a, layers: Math.max(2, Math.round(l || 2)) }], hoop: input.plan.hoop })
+    // 默认插入到升序位置；要改缠绕先后用行尾的 ↑↓
+    const g = { angle: a, layers: Math.max(2, Math.round(l || 2)) }
+    const at = spiral.findIndex((x) => x.angle > a)
+    const next = [...spiral]
+    next.splice(at === -1 ? next.length : at, 0, g)
+    setPlan({ spiral: next, hoop: input.plan.hoop })
   }
   const setHoop = (layers: number) => setPlan({ spiral, hoop: Math.max(0, layers) })
 
@@ -40,6 +53,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
         <table className="grid">
           <thead>
             <tr>
+              <th>缠绕先后</th>
               <th>角度</th>
               <th>类型</th>
               <th>层数（步进可调）</th>
@@ -50,11 +64,22 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
             </tr>
           </thead>
           <tbody>
-            {spiral.map((g) => {
+            {spiral.map((g, gi) => {
               const r = rowOf(g.angle)
               const odd = g.layers % 2 === 1
               return (
                 <tr key={g.angle}>
+                  <td className="tag">
+                    {gi + 1}
+                    <span className="stepper" style={{ marginLeft: 4 }}>
+                      <button onClick={() => move(gi, -1)} disabled={gi === 0} title="上移（更早缠绕）">
+                        ↑
+                      </button>
+                      <button onClick={() => move(gi, 1)} disabled={gi === spiral.length - 1} title="下移（更晚缠绕）">
+                        ↓
+                      </button>
+                    </span>
+                  </td>
                   <td className="angle" style={{ color: CYL_COLOR[g.angle] ?? undefined }}>
                     {g.angle}°
                   </td>
@@ -84,6 +109,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
               )
             })}
             <tr>
+              <td className="tag">—</td>
               <td className="angle">90°</td>
               <td className="tag">环向</td>
               <td>
@@ -104,7 +130,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
               <td className="tag">上不了封头</td>
             </tr>
             <tr className="sub">
-              <td colSpan={2}>分组小计</td>
+              <td colSpan={3}>分组小计</td>
               <td>
                 螺旋 {cy.spiralLayers} 层 / 环向 {cy.hoopLayers} 层
               </td>
@@ -116,7 +142,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
               <td />
             </tr>
             <tr className="total">
-              <td colSpan={2}>合计</td>
+              <td colSpan={3}>合计</td>
               <td>{cy.spiralLayers + cy.hoopLayers} 层</td>
               <td className={cy.paPass ? 'ok' : 'bad'}>{n(cy.pa)}</td>
               <td className={cy.pthPass ? 'ok' : 'bad'}>{n(cy.pth)}</td>

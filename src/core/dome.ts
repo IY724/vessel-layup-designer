@@ -284,6 +284,8 @@ export interface DomeGroupBuildFailure {
 
 /**
  * 由铺层方案的螺旋角组构建封头模型。
+ * 返回顺序 = 用户给定的缠绕先后顺序（不重排）：封头逐层轮廓按此顺序累加堆叠，
+ * 因此若把小角度组放在最后，它会包住前面各层并覆盖极孔区。
  * 环向层（90°）不上封头 → 记入 failed 供界面提示；角度非法/方程组奇异同样记入。
  */
 export function buildDomeGroups(
@@ -294,7 +296,7 @@ export function buildDomeGroups(
 ): { groups: DomeGroup[]; failed: DomeGroupBuildFailure[] } {
   const groups: DomeGroup[] = []
   const failed: DomeGroupBuildFailure[] = []
-  for (const g of [...spiral].sort((x, y) => x.angle - y.angle)) {
+  for (const g of spiral) {
     if (g.layers <= 0) continue
     if (g.angle >= 90) {
       failed.push({ angle: g.angle, reason: '环向层（90°）无法上封头，不参与封头校核' })

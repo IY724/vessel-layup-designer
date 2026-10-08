@@ -251,6 +251,25 @@ describe('封头逐点复现 Excel（总厚度 / 总爆破压强表，抽样 9 �
   })
 })
 
+describe('缠绕顺序由用户决定（数组顺序=缠绕先后，核心不重排）', () => {
+  it('buildDomeGroups / cylinderCheck 保留给定顺序，小角度放最后即最外层包覆', () => {
+    const last = [{ angle: 45, layers: 2 }, { angle: 37, layers: 2 }, { angle: 12, layers: 2 }]
+    const built = buildDomeGroups(last, R, BAND, TC)
+    expect(built.groups.map((g) => g.angle)).toEqual([45, 37, 12])
+    const d = deriveParams(courseCase())
+    const cy = cylinderCheck({ spiral: last, hoop: 3 }, {
+      R, tf: d.tf, tc: d.tc, sigmaSpiral: d.sigmaSpiral, sigmaHoop: d.sigmaHoop, pb: d.pb, alphaRef: 20,
+    })
+    expect(cy.rows.map((r) => r.angle)).toEqual([45, 37, 12, 90])
+    // 求和量与顺序无关：换序后 pα/pθ 不变
+    const asc = cylinderCheck({ spiral: [...last].sort((a, b) => a.angle - b.angle), hoop: 3 }, {
+      R, tf: d.tf, tc: d.tc, sigmaSpiral: d.sigmaSpiral, sigmaHoop: d.sigmaHoop, pb: d.pb, alphaRef: 20,
+    })
+    expect(cy.pa).toBeCloseTo(asc.pa, 12)
+    expect(cy.pth).toBeCloseTo(asc.pth, 12)
+  })
+})
+
 describe('测地线角度 ↔ 极孔（§8.3 对照表）', () => {
   it('r0 = R·sinα 六组全部对齐', () => {
     for (const [a, v] of Object.entries(R0_TABLE)) {
