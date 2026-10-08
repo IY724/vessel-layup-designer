@@ -49,10 +49,11 @@ function check(input: DesignInput, plan: LayupPlan) {
   return cylinderCheck(plan, a).pa >= d.pb - 1e-9 && cylinderCheck(plan, a).pth >= d.pb - 1e-9
 }
 
-function bumpEven(n: number, force: boolean): number {
-  if (n <= 0) return 0
-  if (!force) return Math.round(n)
-  return n % 2 === 0 ? Math.round(n) : Math.round(n) + 1
+function bumpEven(raw: number, force: boolean): number {
+  // 必须先取整再判奇偶：对小数取模会误判（3.5 % 2 = 1.5，四舍五入后是 4 却按"奇"处理成 5）
+  const n = Math.max(0, Math.round(raw))
+  if (!force) return n
+  return n % 2 === 0 ? n : n + 1
 }
 
 export function autoDesign(input: DesignInput): AutoResult {
@@ -175,7 +176,14 @@ export function autoDesign(input: DesignInput): AutoResult {
       trace.push(`封头薄弱点为${res.advice.kind === 'pole-gap' ? '各组极孔边缘的固有低载区（置换无效，已如实报告）' : '不可通过置换解决'}：min=${res.dome.minP.toFixed(1)} MPa`)
       break
     }
-    const best = res.advice.variants.reduce((x, y) => (y.minP > x.minP ? y : x))
+    // 只在"置换后筒身双向仍然达标"的候选里挑封头收益最大的：
+    // 环向层是 pθ 的主力，换多了会把筒身环向换穿，必须回查
+    const usable = res.advice.variants.filter((v) => v.pa >= pb - 1e-9 && v.pth >= pb - 1e-9)
+    if (!usable.length) {
+      trace.push(`封头反馈停止：任何环向⇄高角螺旋置换都会使筒身不再双向达标，保留当前方案（min=${res.dome.minP.toFixed(1)} MPa）`)
+      break
+    }
+    const best = usable.reduce((x, y) => (y.minP > x.minP ? y : x))
     if (best.minP <= res.dome.minP + 1e-6) {
       trace.push(`封头反馈停止：置换已到极限，min=${res.dome.minP.toFixed(1)} MPa < pb=${pb.toFixed(1)}`)
       break
@@ -188,6 +196,12 @@ export function autoDesign(input: DesignInput): AutoResult {
         : [...final.spiral, { angle: target, layers: best.transfer }],
     }
     trace.push(`封头反馈第${round + 1}轮：环向 −${best.transfer} ⇄ ${target}° +${best.transfer} → 预计 min ${best.minP.toFixed(1)}`)
+  }
+
+  // 兜底：反馈后的方案必须仍满足筒身双向要求，否则退回删层结果
+  if (!check(input, final)) {
+    trace.push('反馈后筒身不再双向达标，退回删层后的方案')
+    final = cur
   }
 
   const verdict = runCheck({ ...input, plan: final }).verdict
