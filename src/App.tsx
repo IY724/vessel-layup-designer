@@ -133,8 +133,10 @@ export default function App() {
       </div>
 
       {expand === 'contour' && (
-        <Modal title="封头厚度几何轮廓 — 椭球截面 · 一层层轮廓线" onClose={() => setExpand(null)} wide>
-          <DomeContour input={input} result={result} W={1360} H={560} />
+        <Modal title="封头厚度几何轮廓" onClose={() => setExpand(null)} wide>
+          <div style={{ maxWidth: 1150 }}>
+            <DomeContour input={input} result={result} W={1150} H={620} />
+          </div>
         </Modal>
       )}
       {expand === 'curve' && (
