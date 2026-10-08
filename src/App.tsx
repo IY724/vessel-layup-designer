@@ -6,6 +6,7 @@ import { Overview } from './ui/Overview'
 import { CylinderPanel } from './ui/CylinderPanel'
 import { DomeContour, DomePanel, PressureChart } from './ui/DomePanel'
 import { DetailView } from './ui/DetailView'
+import { GeometryPanel } from './ui/GeometryPanel'
 import { Modal } from './ui/Modal'
 import { PRESETS } from './core/presets'
 import { autoDesign } from './core/designer'
@@ -111,6 +112,7 @@ export default function App() {
           )}
           <CylinderPanel store={store} />
           <DomePanel input={input} result={result} onExpand={(w) => setExpand(w)} />
+          <GeometryPanel input={input} result={result} />
         </div>
       </div>
 
