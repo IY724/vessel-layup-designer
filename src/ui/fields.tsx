@@ -5,8 +5,7 @@ export function Section(props: { n: number | string; title: string; tail?: React
   return (
     <div className="card">
       <h3>
-        <span className="n">{props.n}</span>
-        {props.title}
+        {props.n}. {props.title}
         {props.tail && <span className="tail">{props.tail}</span>}
       </h3>
       {props.children}
@@ -92,16 +91,13 @@ export function Chips(props: { items: number[]; onChange: (items: number[]) => v
       {props.items.map((a) => (
         <span className="chip" key={a}>
           {a}°
-          <button
-            title="删除该角度"
-            onClick={() => props.onChange(props.items.filter((x) => x !== a))}
-          >
-            ×
+          <button title="删除该角度" onClick={() => props.onChange(props.items.filter((x) => x !== a))}>
+            x
           </button>
         </span>
       ))}
       <span className="chip" style={{ background: '#fff', borderStyle: 'dashed' }}>
-        <button onClick={add} title="新增候选角">＋</button>
+        <button onClick={add} title="新增候选角">+</button>
       </span>
     </div>
   )

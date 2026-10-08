@@ -12,7 +12,7 @@ export function Modal(props: { title: string; onClose: () => void; children: Rea
         <header>
           <b>{props.title}</b>
           <button className="btn sm" onClick={props.onClose}>
-            关闭 ✕
+            关闭
           </button>
         </header>
         {props.children}

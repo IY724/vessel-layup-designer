@@ -134,7 +134,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
         <h3>
           <span className="n">7</span>
           几何板块 — 容积↔尺寸互算与内胆轮廓
-          <span className="tail">朱宁式(2.6/2.7) · 半椭球封头 · Ⅳ型瓶（塑料内胆）口径</span>
+          <span className="tail">朱宁式(2.6/2.7) · 半椭球封头 · Ⅳ型瓶口径</span>
         </h3>
         <div className="dome">
           <div className="pane">
@@ -155,9 +155,9 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
             <N label="极孔半径 r₀（物理孔径）" value={vp.r0} unit="mm" step={0.5} onChange={(v) => set({ r0: v })} />
             <N label="阀座容积折减 K_f" value={vp.Kf} step={0.05} onChange={(v) => set({ Kf: v })} />
             <div className="hint">
-              ↳ 封头深度 b = R_in/λ = <b>{f(headMinorAxis(vp))}</b> mm（Excel 表 C14「封头短半轴」就是这个量）
+              封头深度 b = R_in/λ = <b>{f(headMinorAxis(vp))}</b> mm（Excel 表 C14「封头短半轴」就是这个量）
               <br />
-              ↳ R_in 是内胆外表面半径，与铺层设计里的缠绕层受力半径 R（当前 {R} mm）不是同一个量
+              R_in 是内胆外表面半径，与铺层设计里的缠绕层受力半径 R（当前 {R} mm）不是同一个量
             </div>
             <div className="derived">
               <div>
@@ -166,13 +166,13 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
               </div>
               {unknown !== 'none' && (
                 <div style={{ color: solved.ok ? '#15803d' : '#b91c1c' }}>
-                  {solved.ok ? `✓ ${solved.solved}` : `✗ ${solved.solved}`}
+                  {solved.ok ? solved.solved : `无解：${solved.solved}`}
                 </div>
               )}
             </div>
             {hints.map((c) => (
               <div key={c.text} className={`banner ${c.level === 'ok' ? 'ok' : ''}`} style={{ marginTop: 6 }}>
-                <span>{c.level === 'ok' ? '✓' : '⚠'}</span>
+                {c.level === 'ok' ? '' : '注意：'}
                 <div>{c.text}</div>
               </div>
             ))}
@@ -187,7 +187,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
         <h3>
           <span className="n">8</span>
           线型缠绕切点校验与Ⅳ型瓶接头尺寸
-          <span className="tail">郑强表2-1 · 插件 type4_builder_kernel.py 口径</span>
+          <span className="tail">郑强表2-1 · 插件 kernel 口径</span>
         </h3>
         <div className="dome">
           <div className="pane">
@@ -219,7 +219,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
                   {matches.map((m) => (
                     <tr key={`${m.n}-${m.K}-${m.m}`}>
                       <td>{f(m.theta, 1)}°</td>
-                      <td className={m.n <= 4 ? 'ok' : ''}>{m.n}</td>
+                      <td>{m.n}</td>
                       <td>{m.K}</td>
                       <td>{m.m}</td>
                       <td className={Math.abs(m.dev) < 10 ? 'ok' : 'bad'}>
@@ -232,7 +232,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
               </table>
             </div>
             <div className="hint">
-              ↳ 选表原则：切点少者优（极孔架空与应力集中小）。表由 θ=360°(m+K/n) 生成，
+              选表原则：切点少者优（极孔架空与应力集中小）。表由 θ=360°(m+K/n) 生成，
               与郑强表2-1 逐格核对；朱宁引用的 n=4、θ_n=630° 即 m=1、K=3。
               线型表共 {lineTypeTable().length} 格。
             </div>
@@ -287,7 +287,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
                   {checks.map((c) => (
                     <tr key={c.name + c.text}>
                       <td>{c.name}</td>
-                      <td className={c.ok ? 'ok' : 'bad'}>{c.ok ? '✓' : '✗'}</td>
+                      <td className={c.ok ? 'ok' : 'bad'}>{c.ok ? '通过' : '不通过'}</td>
                       <td style={{ textAlign: 'left', whiteSpace: 'normal', fontSize: 11 }}>{c.text}</td>
                       <td className="tag">{c.src}</td>
                     </tr>
@@ -296,7 +296,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
               </table>
             </div>
             <div className="hint">
-              ↳ 接头段长度不设输入，全部由圆角相切关系定位（kernel:17-19）；R_nf 与封头外曲线的切点为数值求根，
+              接头段长度不设输入，全部由圆角相切关系定位（kernel:17-19）；R_nf 与封头外曲线的切点为数值求根，
               无闭式解。螺纹/密封面几何插件未建，需要时另行补充。
             </div>
           </div>

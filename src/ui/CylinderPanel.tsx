@@ -47,7 +47,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
     <div className="card">
       <h3>
         筒身铺层方案
-        <span className="tail">网格理论 · 层数不限，滚动编辑，改动即时刷新（螺旋层 ±成对，故应为偶数）</span>
+        <span className="tail">网格理论 · 行序即缠绕先后 · 改层数即时重算</span>
       </h3>
       <div className="tablewrap">
         <table className="grid">
@@ -73,10 +73,10 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
                     {gi + 1}
                     <span className="stepper" style={{ marginLeft: 4 }}>
                       <button onClick={() => move(gi, -1)} disabled={gi === 0} title="上移（更早缠绕）">
-                        ↑
+                        ▲
                       </button>
                       <button onClick={() => move(gi, 1)} disabled={gi === spiral.length - 1} title="下移（更晚缠绕）">
-                        ↓
+                        ▼
                       </button>
                     </span>
                   </td>
@@ -95,14 +95,14 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
                       />
                       <button onClick={() => setLayers(g.angle, g.layers + 1)}>＋</button>
                     </span>
-                    {odd && <span className="tag" style={{ color: '#d97706' }}> ⚠非偶</span>}
+                    {odd && <span className="tag" style={{ color: '#8a5a00' }}> 非偶数</span>}
                   </td>
                   <td>{n(r?.paSum ?? 0)}</td>
                   <td>{n(r?.pthSum ?? 0)}</td>
                   <td>{n(g.layers * result.derived.tc)}</td>
                   <td>
                     <button className="btn sm ghost" onClick={() => removeGroup(g.angle)} title="删除该角度组">
-                      ✕
+                      删
                     </button>
                   </td>
                 </tr>
@@ -154,7 +154,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
         <button className="btn sm" onClick={addGroup}>
-          ＋ 添加角度组
+          + 添加角度组
         </button>
         <span className="tag">
           设计爆压 pb = {n(pb, 1)} MPa；单层厚 tc = {n(result.derived.tc, 4)} mm；σ发挥 螺旋 {n(result.derived.sigmaSpiral, 0)} / 环向{' '}
@@ -163,7 +163,6 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
       </div>
       {result.advice.kind !== 'none' && (
         <div className={`banner ${result.verdict === 'fail' ? 'err' : ''}`} style={{ marginTop: 10 }}>
-          <span>💡</span>
           <div>
             <b>薄弱环诊断：</b>
             {result.advice.text}
@@ -185,8 +184,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
         .slice(0, 4)
         .map((d, i) => (
           <div key={i} className={`banner ${d.level === 'error' ? 'err' : ''}`} style={{ marginTop: 6 }}>
-            <span>{d.level === 'error' ? '⛔' : '⚠'}</span>
-            <div>{d.text}</div>
+            <div>{d.level === 'error' ? '错误：' : '提示：'}{d.text}</div>
           </div>
         ))}
     </div>

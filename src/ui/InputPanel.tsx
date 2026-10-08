@@ -31,7 +31,7 @@ export function InputPanel({ store }: { store: DesignStore }) {
 
   return (
     <div className="inputs panel">
-      <Section n={1} title="几何参数" tail="全部默认可改">
+      <Section n={1} title="几何参数" tail="可编辑">
         <Num label="筒身段半径 R" value={g.R} unit="mm" step={0.5} onChange={(v) => v !== null && setGeometry({ R: v })} />
         <Radio
           label="极孔半径口径"
@@ -51,7 +51,7 @@ export function InputPanel({ store }: { store: DesignStore }) {
           </>
         )}
         <div className={`hint${consistency && consistency.level !== 'ok' ? ' warn' : ''}`}>
-          ↳ 缠绕极孔 r₀ = {f(d.r0, 3)} mm，对应测地线角 α = arcsin(r₀/R) = <b>{f(implied, 2)}°</b>
+          缠绕极孔 r₀ = {f(d.r0, 3)} mm，对应测地线角 α = arcsin(r₀/R) = <b>{f(implied, 2)}°</b>
           {minAngle !== null && (
             <>
               <br />
@@ -81,9 +81,9 @@ export function InputPanel({ store }: { store: DesignStore }) {
         <Num label="纤维体积含量 Vf" value={m.vf} step={0.01} onChange={(v) => v !== null && patch('material', { vf: v })} />
         <Num label="树脂密度（重量用）" value={m.resinDensity} unit="g/cm³" step={0.05} onChange={(v) => v !== null && patch('material', { resinDensity: v })} />
         <div className="hint">
-          ↳ 自动派生：tf = tex/(ρ·b) = <b>{f(tf, 4)}</b> mm　tc = tf/Vf = <b>{f(tc, 4)}</b> mm
+          自动派生：tf = tex/(ρ·b) = <b>{f(tf, 4)}</b> mm　tc = tf/Vf = <b>{f(tc, 4)}</b> mm
           <br />
-          ↳ 封头每组循环数 = 该组层数 / 2（★每组各自取值）
+          封头每组循环数 = 该组层数 / 2（每组各自取值）
         </div>
       </Section>
 
@@ -102,9 +102,9 @@ export function InputPanel({ store }: { store: DesignStore }) {
             <Num label="NOL 环拉伸强度 σ_NOL" value={s.sigmaNOL} unit="MPa" step={5} onChange={(v) => v !== null && patch('strength', { sigmaNOL: v })} />
             <Num label="强度损失系数 k" value={s.kLoss} step={0.01} onChange={(v) => v !== null && patch('strength', { kLoss: v })} hint="课程经验 0.8~0.9" />
             <div className="hint">
-              ↳ σ发挥 = σ_NOL / Vf × k = <b>{f(d.sigmaSpiral, 1)}</b> MPa（螺旋/环向同值）
+              σ发挥 = σ_NOL / Vf × k = <b>{f(d.sigmaSpiral, 1)}</b> MPa（螺旋/环向同值）
               <br />
-              ↳ σc 复材层 = σ发挥 × Vf = <b>{f(d.sigmaComposite, 1)}</b> MPa
+              σc 复材层 = σ发挥 × Vf = <b>{f(d.sigmaComposite, 1)}</b> MPa
             </div>
           </>
         ) : (
@@ -119,9 +119,9 @@ export function InputPanel({ store }: { store: DesignStore }) {
               onChange={(v) => patch('strength', { sigmaCompositeDirect: v })}
             />
             <div className="hint">
-              ↳ 筒身纵向/环向分别用 σ_螺旋、σ_环向；封头用 σc = <b>{f(d.sigmaComposite, 1)}</b> MPa
+              筒身纵向/环向分别用 σ_螺旋、σ_环向；封头用 σc = <b>{f(d.sigmaComposite, 1)}</b> MPa
               <br />
-              ↳ 70MPa 课程案例即此模式（螺旋 3859 / 环向 4342 MPa）
+              70MPa 课程案例即此模式（螺旋 3859 / 环向 4342 MPa）
             </div>
           </>
         )}
@@ -170,10 +170,10 @@ export function InputPanel({ store }: { store: DesignStore }) {
           <Num label="r_boss" value={c.rBoss} unit="mm" step={1} onChange={(v) => v !== null && patch('constraint', { rBoss: v })} />
         )}
         <div className="hint">
-          ↳ 封头判定窗口 r ∈ [{f(effectiveRBoss(input), 1)}, {g.R}] mm，只用铺层自身的量（最高角组的 r0g）：
+          封头判定窗口 r ∈ [{f(effectiveRBoss(input), 1)}, {g.R}] mm，只用铺层自身的量（最高角组的 r0g）：
           窗口以下的极孔区段只有部分角度组铺到、局部角趋于 90°，cos²α 判据在该处趋于 0，属判据奇异区，只画出不作判定
           <br />
-          ↳ 层数、角度组数均不设上限；约束不可行时算法明确报错并给出缺口方向与数值
+          层数、角度组数均不设上限；约束不可行时算法明确报错并给出缺口方向与数值
         </div>
       </Section>
 
@@ -184,9 +184,9 @@ export function InputPanel({ store }: { store: DesignStore }) {
           <div>缠绕层总厚 <b>{f(result.cylinder.totalThickness)} mm</b></div>
           <div>封头厚度峰值 <b>{f(Math.max(...result.dome.profile.map((p) => p.tTotal)))} mm</b> @ r≈{f(result.dome.profile.reduce((a, b) => (b.tTotal > a.tTotal ? b : a), result.dome.profile[0]).r, 1)}</div>
           <div>
-            状态：{result.cylinder.paPass && result.cylinder.pthPass ? '筒身 ✓ 满足' : '筒身 ✗ 不足'}
+            状态：{result.cylinder.paPass && result.cylinder.pthPass ? '筒身 满足' : '筒身 不足'}
             {' | '}
-            封头 {result.dome.pass ? '✓ 满足' : '△ 薄弱待调整'}
+            封头 {result.dome.pass ? '满足' : '薄弱，待调整'}
           </div>
           <div>
             复材重量参考 <b>{f(result.weight.totalKg, 2)} kg</b>（筒身 {f(result.weight.cylinderKg, 2)} + 2×封头 {f(result.weight.domeKg, 2)}，ρc={f(result.weight.rhoComposite, 2)}）

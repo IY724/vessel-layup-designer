@@ -2,7 +2,7 @@
  * DomePanel.tsx — 封头校核面板（规划 §6.3 定稿）
  *  左：椭球截面"一层层"厚度轮廓线（不填充：内衬灰线 + 各角度组外表面彩色轮廓 + 与筒身段衔接）
  *  右：p总(r)×ks 曲线（pb 水平线、薄弱区红色着色、接嘴补强区灰化、hover 读数、可叠加 Excel 原样口径对比）
- * 两图与铺层表实时联动（改层数即重绘），均可 ⤢ 弹出大图。
+ * 两图与铺层表实时联动（改层数即重绘），均可 放大。
  */
 import { useMemo, useState } from 'react'
 import type { CheckResult, DesignInput } from '../core/types'
@@ -369,7 +369,7 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
       <h3>
         封头校核 — 缠绕规律厚度与承载（逐角度组）
         <span className="tail">
-          口径：{input.refMode === 'corrected' ? '修正版 cos²α' : 'Excel 原样 cos(u·cos u)'} · ks={input.requirement.ks}
+          {input.refMode === 'corrected' ? '修正 cos²α' : 'Excel 原样'} · ks={input.requirement.ks}
         </span>
       </h3>
       <div className="dome">
@@ -379,7 +379,7 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
           <DomeContour input={input} result={result} opts={opts} />
           <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={() => props.onExpand('contour')}>
-              ⤢ 弹出大图
+              放大
             </button>
             {(
               [
@@ -401,7 +401,7 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
           <PressureChart input={input} result={result} showExcel={showExcel} />
           <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={() => props.onExpand('curve')}>
-              ⤢ 弹出大图
+              放大
             </button>
             <label className="radios" style={{ fontSize: 11.5 }}>
               <input type="checkbox" checked={showExcel} onChange={(e) => setShowExcel(e.target.checked)} />

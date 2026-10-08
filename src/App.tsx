@@ -103,8 +103,8 @@ export default function App() {
     <div className="app">
       <div className="topbar">
         <div className="brand">
-          <b>复合材料气瓶缠绕铺层设计系统</b>
-          <span>铺层设计工作台 · 第一期 V0.1 · 网格理论 + 封头缠绕规律校核</span>
+          <b>复合材料气瓶缠绕铺层设计</b>
+          <span>V1.0 · 网格理论筒身 / 封头缠绕规律校核</span>
         </div>
         <label className="cap">预设模板</label>
         <select value={presetId} onChange={(e) => setPreset(e.target.value)}>
@@ -123,7 +123,7 @@ export default function App() {
             }}
             title="按候选角集与约束自动生成铺层方案"
           >
-            ⚡ 自动生成
+            自动生成
           </button>
           <button
             className={mode === 'manual' ? 'on' : ''}
@@ -137,7 +137,7 @@ export default function App() {
           </button>
         </div>
         <button className="btn" onClick={reset}>
-          ↺ 重置
+          重置
         </button>
         <label className="cap">口径</label>
         <select value={input.refMode} onChange={(e) => setInput({ ...input, refMode: e.target.value as RefMode })}>
@@ -145,7 +145,7 @@ export default function App() {
           <option value="excel">Excel 原样复算</option>
         </select>
         <button className="btn" onClick={importJson} title="读回之前导出的方案 JSON">
-          ⇪ 导入 JSON
+          导入 JSON
         </button>
         <button className="btn" onClick={exportJson}>
           导出方案 JSON
@@ -154,7 +154,7 @@ export default function App() {
           导出 Excel 报告
         </button>
         <button className="btn" onClick={() => window.print()} title="打印或另存为 PDF">
-          🖨 打印/PDF
+          打印/PDF
         </button>
         <label className="cap">强度预设</label>
         <select
@@ -191,22 +191,13 @@ export default function App() {
         </div>
       </div>
 
-      <div className="footer">
-        <b>交互设计要点</b>
-        <div className="pts" style={{ marginTop: 6 }}>
-          <div>① 极孔口径二选一，与 α_min 一致性校验</div>
-          <div>② 角度 chips 增删；分配规则"隔一取一"可选</div>
-          <div>③ 层数步进、行数不限、三视图即时刷新</div>
-          <div>④ 强度模式 A 自算 / B 直填（螺旋环向可分）</div>
-          <div>⑤ 封头薄弱区自动着色 + 等厚置换建议</div>
-          <div>⑥ 导出方案 JSON（供二期几何/Abaqus 插件消费）</div>
-          <div>⑦ 曲线图 ⤢ 弹出独立大图窗口</div>
-          <div>⑧ 封头厚度：椭球截面一层层几何轮廓</div>
-        </div>
-        <div style={{ marginTop: 8, color: '#94a3b8' }}>
-          计算核心已与两张 Excel 逐点对账（144 格点，厚度 ≤1e-3 mm / 爆压 ≤1e-2 MPa），基准测试见仓库 tests/。
-          Excel 导出（复刻两张表）与几何板块（容积驱动外形）为下一里程碑。
-        </div>
+      <div className="statusbar">
+        <span>版本 V1.0</span>
+        <span>计算口径：{input.refMode === 'corrected' ? '修正 cos²α' : 'Excel 原样复算'}</span>
+        <span>判定窗口 r_boss：{input.constraint.rBossAuto ? '自动（全铺层覆盖起点）' : '手动'}</span>
+        <span>公式依据：两张课程 Excel + 朱宁2023 / 郑强2008 + type4 插件 kernel</span>
+        <span>数值对账：tests/ 99 项断言（封头 144 格点逐点）</span>
+        <span>本机离线运行，不上传数据</span>
       </div>
 
       {expand === 'contour' && (

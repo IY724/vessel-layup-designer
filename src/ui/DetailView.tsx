@@ -27,7 +27,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
   return (
     <div className="detail">
       <div className="grp">
-        <b>① 参数区（对照 Excel「参数设置」A~C 列）</b>
+        <b>1) 参数区（对照 Excel「参数设置」A~C 列）</b>
         <KV
           rows={[
             ['筒身段半径 R', `${n(g.R, 3)} mm`],
@@ -50,7 +50,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
       </div>
 
       <div className="grp">
-        <b>② 筒身缠绕角参数与强度（对照「缠绕角度参数计算」H~L 列）</b>
+        <b>2) 筒身缠绕角参数与强度（对照「缠绕角度参数计算」H~L 列）</b>
         <div className="tablewrap" style={{ maxHeight: 240 }}>
           <table className="grid">
             <thead>
@@ -100,7 +100,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
       </div>
 
       <div className="grp">
-        <b>③ 封头逐角度组参数（对照各角度 sheet 的 F~P 列与 m1~m4）</b>
+        <b>3) 封头逐角度组参数（对照各角度 sheet 的 F~P 列与 m1~m4）</b>
         <div className="tablewrap" style={{ maxHeight: 260 }}>
           <table className="grid">
             <thead>
@@ -168,7 +168,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
       </div>
 
       <div className="grp">
-        <b>④ 封头沿母线数值（对照「总厚度」「总爆破压强」两个 sheet）</b>
+        <b>4) 封头沿母线数值（对照「总厚度」「总爆破压强」两个 sheet）</b>
         <div className="tablewrap" style={{ maxHeight: 260 }}>
           <table className="grid">
             <thead>
@@ -196,7 +196,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
                     <td>{p.pSum.toFixed(3)}</td>
                     <td>{p.pTotal.toFixed(3)}</td>
                     <td className={p.r < rBoss ? '' : p.pTotal >= d.pb ? 'ok' : 'bad'}>
-                      {p.r < rBoss ? '接嘴区' : p.pTotal >= d.pb ? '✓' : '✗'}
+                      {p.r < rBoss ? '极孔侧' : p.pTotal >= d.pb ? '达标' : '不达标'}
                     </td>
                   </tr>
                 ))}
@@ -206,7 +206,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
       </div>
 
       <div className="grp">
-        <b>⑤ 公式对照（Excel 原文 ⇄ 软件实现）</b>
+        <b>5) 公式对照（Excel 原文 ⇄ 软件实现）</b>
         <table className="formula">
           <tbody>
             {[...CYLINDER_FORMULAS, ...DOME_FORMULAS].map((f, i) => (
@@ -222,7 +222,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
       </div>
 
       <div className="grp">
-        <b>⑥ 已核对出的原表问题</b>
+        <b>6) 已核对出的原表问题</b>
         <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
           {EXCEL_ISSUES.map((x) => (
             <li key={x.id} style={{ marginBottom: 4 }}>
@@ -234,12 +234,12 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
       </div>
 
       <div className="grp">
-        <b>⑦ 一致性检查与全部诊断</b>
+        <b>7) 一致性检查与全部诊断</b>
         <KV
           rows={[
             ['封头 t总(R)', `${n(result.consistency.domeSpiralAtR)} mm`],
             ['筒身螺旋层厚', `${n(result.consistency.cylinderSpiral)} mm`],
-            ['衔接偏差', `${result.consistency.diff >= 0 ? '+' : ''}${n(result.consistency.diff)} mm ${result.consistency.ok ? '✓' : '△ >8%'}`],
+            ['衔接偏差', `${result.consistency.diff >= 0 ? '+' : ''}${n(result.consistency.diff)} mm ${result.consistency.ok ? '合格' : '偏大 >8%'}`],
             ['封头有效区最小爆压', `${n(dome.minP, 2)} MPa @ r=${n(dome.minPR, 1)}`],
             ['封头全区间最小（含接嘴区）', `${n(dome.minPAll, 2)} MPa`],
             ['封头峰值厚度', `${n(Math.max(...dome.profile.map((p) => p.tTotal)), 3)} mm @ r=${n(dome.profile.reduce((a, b) => (b.tTotal > a.tTotal ? b : a), dome.profile[0]).r, 1)}`],
