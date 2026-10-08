@@ -1,0 +1,48 @@
+name: 公式 / 物理口径问题
+description: 指出公式推导、单位换算、判据取值与课件或 Excel 原表不一致的地方（需附可复算依据）
+labels: ["calculation-core", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本项目的计算口径以两张课程 Excel 的缓存值为基准（见 `tests/baseline.test.ts`）。
+        提问题时请给出**可复算的依据**：Excel 单元格地址、课件页码或文献公式编号。
+  - type: textarea
+    id: where
+    attributes:
+      label: 涉及的位置
+      description: 文件与函数，例如 src/core/dome.ts groupPressure()
+      placeholder: src/core/dome.ts — groupPressure()
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: 软件当前口径
+      description: 当前实现写成什么公式、算出什么数
+      placeholder: 'p_g = 2·t_g·σc/R·cos²α；r=81 时得 65.1 MPa'
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 应为 / 期望口径
+      description: 你认为正确的公式与数值
+      placeholder: '应含环向项 …；期望 ≈79 MPa'
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 依据
+      description: Excel 单元格 / 课件页码 / 文献公式号（必填）
+      placeholder: '封头表 10° sheet L23；或 朱宁2023 式(3-12)'
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 影响范围
+      description: 会影响哪些输出（判定、曲线、导出报告）与量级
+    validations:
+      required: true
