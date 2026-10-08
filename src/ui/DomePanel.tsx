@@ -28,6 +28,8 @@ interface Geom {
   wallXs: number[]
   peakTotal: { t: number; r: number; x: number; y: number }
   rStart: number
+  /** 按宽度定比例后实际需要的画布高度（避免图形挤在上半部、下方大片留白） */
+  usedH: number
 }
 
 function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number): Geom {
@@ -42,7 +44,11 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
   const maxT = Math.max(1, ...prof.map((p) => p.tTotal))
 
   const pad = 18
-  const sc = Math.min((W / 2 - pad * 2) / (R + maxT + 6), (H - pad * 3) / (hAxis + maxT + wall + 6))
+  // 先按宽度定比例（宽度是主尺度），再按 H 上限回缩；画布高度取实际用高
+  let sc = (W / 2 - pad * 2) / (R + maxT + 6)
+  const needH = (v: number) => pad * 2 + 30 + (hAxis + maxT + v) * sc
+  if (needH(wall) > H) sc = ((H - pad * 2 - 30) / (hAxis + maxT + wall)) * 0.999
+  const usedH = Math.min(H, needH(wall) + 26)
   const axisX = W / 2
   const top = pad + 16
   const eqY = top + hAxis * sc
@@ -101,6 +107,7 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
     wallXs: [axisX + R * sc, axisX + (R + spiralThk) * sc, axisX + (R + wall) * sc],
     peakTotal: { t: pk.tTotal, r: pk.r, x: px, y: py },
     rStart,
+    usedH,
   }
 }
 
@@ -108,12 +115,13 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
   const W = props.W ?? 620
   const H = props.H ?? 420
   const g = useMemo(() => buildGeom(props.input, props.result, W, H), [props.input, props.result, W, H])
+  const VH = g.usedH
   const groups = props.result.dome.groups
   const cy = props.result.cylinder
   const mirrorX = (x: number) => 2 * g.axisX - x
 
   return (
-    <svg className="viz" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="封头厚度几何轮廓">
+    <svg className="viz" viewBox={`0 0 ${W} ${VH}`} role="img" aria-label="封头厚度几何轮廓">
       <line x1={g.axisX} y1={g.cylBottom} x2={g.axisX} y2={10} stroke="#cbd5e1" strokeDasharray="5,4" />
       {/* 金属接嘴 / 极孔 */}
       <rect x={g.boss.x} y={g.boss.y} width={g.boss.w} height={g.boss.h} fill="#cbd5e1" stroke="#94a3b8" />
@@ -159,19 +167,19 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
       </text>
       {/* 图例 */}
       <g fontSize="9.5" fill="#475569">
-        <line x1={16} y1={H - 10} x2={32} y2={H - 10} stroke="#94a3b8" strokeWidth="2" />
-        <text x={36} y={H - 7}>
+        <line x1={16} y1={VH - 10} x2={32} y2={VH - 10} stroke="#94a3b8" strokeWidth="2" />
+        <text x={36} y={VH - 7}>
           内衬
         </text>
         {groups.map((gr, i) => (
           <g key={gr.angle} transform={`translate(${64 + i * 54},0)`}>
-            <line x1={0} y1={H - 10} x2={16} y2={H - 10} stroke={angleColor(gr.angle, i)} strokeWidth="2" />
-            <text x={20} y={H - 7}>
+            <line x1={0} y1={VH - 10} x2={16} y2={VH - 10} stroke={angleColor(gr.angle, i)} strokeWidth="2" />
+            <text x={20} y={VH - 7}>
               {gr.angle}°×{gr.layers}
             </text>
           </g>
         ))}
-        <text x={64 + groups.length * 54 + 4} y={H - 7} fill="#94a3b8">
+        <text x={64 + groups.length * 54 + 4} y={VH - 7} fill="#94a3b8">
           轮廓线=各层外表面（低角最内）· 单层 {n(props.result.derived.tc, 3)} mm
         </text>
       </g>
