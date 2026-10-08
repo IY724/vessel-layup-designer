@@ -7,6 +7,7 @@
 import { useMemo, useState } from 'react'
 import type { CheckResult, DesignInput } from '../core/types'
 import { domeAt } from '../core/dome'
+import { effectiveRBoss } from '../core/checker'
 import { angleColor } from './colors'
 
 const n = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—')
@@ -200,10 +201,7 @@ export function PressureChart(props: {
   const pb = derived.pb
   const prof = dome.profile
   const rStart = prof.length ? prof[0].r : 0
-  const rBoss = Math.max(
-    input.constraint.rBossAuto ? rStart + result.derived.bandTotal : input.constraint.rBoss,
-    rStart,
-  )
+  const rBoss = effectiveRBoss(input)
 
   const pad = { l: 46, r: 18, t: 18, b: 36 }
   const pMax = Math.max(pb * 1.3, ...prof.map((p) => p.pTotal)) * 1.08
@@ -247,10 +245,10 @@ export function PressureChart(props: {
         opacity="0.13"
       />
       <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={H - pad.b - 10} fontSize="9" fill="#64748b" textAnchor="middle">
-        金属接嘴
+        极孔侧
       </text>
       <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={H - pad.b + 1} fontSize="9" fill="#64748b" textAnchor="middle">
-        补强区(不计入)
+        部分覆盖·仅参考
       </text>
       {dome.weakZones.map((z, i) => (
         <rect key={i} x={X(z.from)} y={Y(pb)} width={Math.max(1.5, X(z.to) - X(z.from))} height={Y(0) - Y(pb)} fill="#dc2626" opacity="0.16" />
@@ -339,7 +337,7 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
         </div>
         <div className="pane">
           <h4>封头爆破压强 p总(r) × ks = {input.requirement.ks}</h4>
-          <div className="sub">灰=接嘴区不计入判定 · 悬停看逐组分解</div>
+          <div className="sub">灰=极孔侧部分覆盖（判据奇异，仅参考）· 悬停看逐组分解</div>
           <PressureChart input={input} result={result} showExcel={showExcel} />
           <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={() => props.onExpand('curve')}>

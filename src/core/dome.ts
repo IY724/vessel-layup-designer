@@ -265,6 +265,9 @@ export function domeCheck(groups: DomeGroup[], a: DomeArgs, failed: DomeGroupBui
   return {
     groups: active,
     profile,
+    rFirst: start,
+    rFull: active.length ? Math.max(...active.map((g) => g.r0)) : start,
+    rBoss: a.rBoss,
     minP: Number.isFinite(minP) ? minP : 0,
     minPR,
     maxP: Number.isFinite(maxP) ? maxP : 0,

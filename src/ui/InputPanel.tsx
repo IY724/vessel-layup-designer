@@ -165,13 +165,13 @@ export function InputPanel({ store }: { store: DesignStore }) {
         </div>
         <Check label="螺旋层必须偶数（±成对）" checked={c.forceEvenSpiral} onChange={(v) => patch('constraint', { forceEvenSpiral: v })} />
         <Num label="参考角 αref（初估用）" value={c.alphaRef} unit="°" step={1} onChange={(v) => v !== null && patch('constraint', { alphaRef: v })} />
-        <Check label="判定窗口下界 r_boss 自动取（最低角组 r₀ + 1 带宽）" checked={c.rBossAuto} onChange={(v) => patch('constraint', { rBossAuto: v })} />
+        <Check label="判定窗口下界 r_boss 自动取「全铺层覆盖起点」max(r0g)" checked={c.rBossAuto} onChange={(v) => patch('constraint', { rBossAuto: v })} />
         {!c.rBossAuto && (
           <Num label="r_boss" value={c.rBoss} unit="mm" step={1} onChange={(v) => v !== null && patch('constraint', { rBoss: v })} />
         )}
         <div className="hint">
-          ↳ 封头判定窗口 r ∈ [{f(effectiveRBoss(input), 1)}, {g.R}] mm：
-          窗口下界以下为金属接嘴/瓶口补强区，不计入最小爆压判定
+          ↳ 封头判定窗口 r ∈ [{f(effectiveRBoss(input), 1)}, {g.R}] mm，只用铺层自身的量（最高角组的 r0g）：
+          窗口以下的极孔区段只有部分角度组铺到、局部角趋于 90°，cos²α 判据在该处趋于 0，属判据奇异区，只画出不作判定
           <br />
           ↳ 层数、角度组数均不设上限；约束不可行时算法明确报错并给出缺口方向与数值
         </div>

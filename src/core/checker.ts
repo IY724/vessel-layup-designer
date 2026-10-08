@@ -4,11 +4,15 @@
  * 判定口径（重要，界面必须如实标注）：
  *   筒身：pα ≥ pb 且 pθ ≥ pb（网格理论等厚，与长度无关）
  *   封头：min{ ks·Σp_g(r) | r ∈ [r_boss, R] } ≥ pb
- *     r_boss 以下视为金属接嘴/瓶口补强区，复材不承担全部压强（默认自动取最低角度组 r0 + 1 倍总带宽，可改）
+ *     判定窗口 [r_boss, R]，r_boss 默认 = 全铺层覆盖起点 max(r0g)（只用铺层自身的量）；
+ *     窗口之外的极孔侧区段 [min(r0g), r_boss) 仅部分角度组覆盖、局部角趋于 90°，
+ *     按 cos²α 判据必然趋于 0，故只画出来、报出数值，不作为通过/不通过的判据。
  *     r → R 处封头公式与筒身公式重合，筒身判定不乘 ks（口径更合理），故封头曲线末端的低值以"×ks 偏保守"标注
  */
 import type {
   Advice,
+  CylinderResult,
+  DerivedParams,
   CheckResult,
   DesignInput,
   Diagnosis,
@@ -22,12 +26,17 @@ import { cylinderCheck } from './netting'
 import { buildDomeGroups, domeCheck } from './dome'
 import { checkPoleConsistency, poleRadius } from './geodesic'
 
+/**
+ * 判定窗口下界 r_boss。
+ * auto = 全铺层覆盖起点 max(r0g)：所有螺旋角组都已铺到的最小平行圆，
+ * 只用铺层自身的量，不引入接头/阀座半径。
+ * 不用 min(r0g)（复合层最小平行圆）是因为那里 cos²α→0，判据必然退化为 0。
+ */
 export function effectiveRBoss(input: DesignInput): number {
-  const { geometry, constraint, plan } = input
+  const { constraint, plan } = input
   if (!constraint.rBossAuto) return constraint.rBoss
-  const angles = plan.spiral.filter((g) => g.layers > 0).map((g) => g.angle)
-  const aMin = angles.length ? Math.min(...angles) : 10
-  return poleRadius(geometry.R, aMin) + totalBand(input)
+  const r0s = plan.spiral.filter((g) => g.layers > 0).map((g) => poleRadius(input.geometry.R, g.angle))
+  return r0s.length ? Math.max(...r0s) : 0
 }
 
 function totalBand(input: DesignInput): number {
@@ -64,11 +73,21 @@ function weightEstimate(input: DesignInput, totalThk: number, domeT: Array<{ r: 
   return { cylinderKg: cylKg, domeKg: headKg, totalKg: cylKg + 2 * headKg, rhoComposite }
 }
 
-export function runCheck(input: DesignInput): CheckResult {
+/**
+ * 单个方案的纯计算（派生参数 + 筒身 + 封头），不含诊断与建议。
+ * 试算变体（suggestHoopSwap / designer 反馈）只用它 —— 否则会与建议生成互相递归。
+ */
+export interface PlanEvaluation {
+  derived: DerivedParams
+  cylinder: CylinderResult
+  dome: DomeResult
+  rBoss: number
+}
+
+export function evaluatePlan(input: DesignInput): PlanEvaluation {
   const derived = deriveParams(input)
   const { geometry, requirement, constraint, plan } = input
   const R = geometry.R
-  const diagnoses: Diagnosis[] = []
 
   const cylinder = cylinderCheck(plan, {
     R,
@@ -96,6 +115,14 @@ export function runCheck(input: DesignInput): CheckResult {
     },
     failed,
   )
+  return { derived, cylinder, dome, rBoss }
+}
+
+export function runCheck(input: DesignInput): CheckResult {
+  const { derived, cylinder, dome, rBoss } = evaluatePlan(input)
+  const { geometry, plan } = input
+  const R = geometry.R
+  const diagnoses: Diagnosis[] = []
 
   const cylinderSpiral = cylinder.spiralThickness
   const domeSpiralAtR = dome.tAtR
@@ -149,7 +176,7 @@ export function runCheck(input: DesignInput): CheckResult {
       text: `一致性检查：封头赤道处 t总(R)=${domeSpiralAtR.toFixed(3)} mm 与筒身螺旋层厚 ${cylinderSpiral.toFixed(3)} mm 偏差 ${diff >= 0 ? '+' : ''}${diff.toFixed(3)} mm（>8%），铺层在封头/筒身衔接处可能不连续`,
     })
   }
-  for (const f of failed) {
+  for (const f of dome.failedGroups) {
     if (f.angle >= 90) continue
     diagnoses.push({ level: 'error', text: f.reason })
   }
@@ -162,7 +189,8 @@ export function runCheck(input: DesignInput): CheckResult {
   if (dome.minPAll < dome.minP && dome.minPAll < derived.pb) {
     diagnoses.push({
       level: 'ok',
-      text: `r<r_boss(${rBoss.toFixed(1)} mm) 区间最小值 ${dome.minPAll.toFixed(1)} MPa 不计入判定：该处为金属接嘴/瓶口补强区`,
+      text: `极孔侧参考值：r ∈ [${dome.rFirst.toFixed(1)}, ${rBoss.toFixed(1)}) 仅部分角度组覆盖、局部角趋于 90°，` +
+        `按 cos²α 判据该区段最小值 ${dome.minPAll.toFixed(1)} MPa 趋于 0，属判据奇异区而非可设计薄弱截面，故不计入判定`,
     })
   }
 
@@ -200,7 +228,7 @@ export function suggestHoopSwap(
     if (hit) hit.layers += k
     else spiral.push({ angle: target, layers: k })
     const variant: DesignInput = { ...input, plan: { spiral, hoop: input.plan.hoop - k } }
-    const res = runCheck(variant)
+    const res = evaluatePlan(variant)
     const last = res.dome.profile[res.dome.profile.length - 1]
     out.push({
       transfer: k,
@@ -224,19 +252,17 @@ export function suggestHoopSwap(
 function buildAdvice(input: DesignInput, dome: DomeResult, rBoss: number): Advice {
   if (dome.pass) return { kind: 'none', text: '封头有效区最小爆压满足设计要求', variants: [] }
   const band = totalBand(input)
-  const r0s = dome.groups.map((g) => g.r0).sort((a, b) => a - b)
-  const nearPole = r0s.length > 0 && dome.minPR < r0s[0] + 1.5 * band
+  const nearPole = dome.minPR < dome.rFull - 1e-9
   const nearEquator = dome.minPR > input.geometry.R - 1.5 * band
   const last = dome.profile[dome.profile.length - 1]
   if (nearPole && !nearEquator) {
     return {
       kind: 'pole-gap',
       text:
-        `薄弱点在 r≈${dome.minPR.toFixed(1)}（最低角度组极孔 r0=${r0s[0].toFixed(1)} 正上方）：` +
-        '该处各组局部缠绕角趋于 90°，螺旋层的纵向承载按 cos²α 归零，属结构固有低载区，' +
-        '由金属接嘴/瓶口补强承担。置换环向层对此无效；' +
-        `如需抬高此点只能提高判定窗口下界 r_boss（当前 ${rBoss.toFixed(1)}）或降低 ks 保守度。` +
-        `（近赤道 r=R 处 ${(last?.pTotal ?? 0).toFixed(1)} MPa）`,
+        `薄弱点在 r≈${dome.minPR.toFixed(1)}，低于全铺层覆盖起点 r=${dome.rFull.toFixed(1)}：` +
+        '该区段只有部分角度组铺到、且各组局部缠绕角趋于 90°，纵向承载按 cos²α 趋于零，' +
+        '属判据奇异区。把判定窗口下界 r_boss 取到全铺层覆盖起点（auto 即此值，当前 ' +
+        `${rBoss.toFixed(1)}）后，薄弱点会落到可设计的截面区间。`,
       variants: [],
     }
   }

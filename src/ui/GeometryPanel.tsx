@@ -8,7 +8,6 @@ import { useMemo, useState } from 'react'
 import type { CheckResult, DesignInput } from '../core/types'
 import {
   PLUGIN_JOINT_DEFAULT,
-  bossZoneRadius,
   checkJoint,
   computeVolume,
   deriveJoint,
@@ -125,7 +124,6 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
   const jd = useMemo(() => deriveJoint(joint, turns.alpha0Deg), [joint, turns.alpha0Deg])
   const checks = useMemo(() => checkJoint(joint, jd, turns.alpha0Deg), [joint, jd, turns.alpha0Deg])
   const hints = useMemo(() => geometryChecks(vp), [vp])
-  const boss = bossZoneRadius(jd, joint)
 
   const set = (patch: Partial<VolumeParams>) => setVp((s) => ({ ...s, ...patch }))
   const setJ = (patch: Partial<JointParams>) => setJoint((s) => ({ ...s, ...patch }))
@@ -271,7 +269,8 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
                 缠绕极孔 r_cl=<b>{f(jd.rCl, 2)}</b> mm ≠ 通孔 r₀=<b>{joint.r0}</b> mm；接头覆盖到 r_sp=<b>{joint.r_sp}</b> mm
               </div>
               <div>
-                → 封头判定窗口下界建议 r_boss ≈ <b>{f(boss.suggest, 1)}</b> mm（当前生效 {f(effectiveRBoss(input), 1)} mm）
+                判定窗口下界取<b>铺层自身的量</b>：全铺层覆盖起点 max(r0g) = <b>{f(result.dome.rFull, 1)}</b> mm（当前生效{' '}{f(effectiveRBoss(input), 1)} mm）；
+                复合层最小平行圆 r_cl={f(jd.rCl, 1)}、接头分界 r_sp={joint.r_sp} 仅作对照，不参与判定
               </div>
             </div>
             <div className="tablewrap" style={{ maxHeight: 200, marginTop: 8 }}>

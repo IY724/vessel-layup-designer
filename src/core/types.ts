@@ -223,16 +223,22 @@ export interface DomeProfilePoint {
 export interface DomeResult {
   groups: DomeGroup[]
   profile: DomeProfilePoint[]
-  /** 复材有效区 [rBoss, R] 内最小 ks·Σp 及位置 */
+  /** 复合层最小平行圆 = 最低角组 r0（该处仅一组覆盖、局部角→90°，纵向承载趋于 0） */
+  rFirst: number
+  /** 全铺层覆盖起点 = 最高角组 r0，判定窗口下界（只用铺层自身的量，不引入接头半径） */
+  rFull: number
+  /** 实际生效的判定窗口下界（auto 时等于 rFull） */
+  rBoss: number
+  /** 判定窗口 [rBoss, R] 内最小 ks·Σp 及位置 */
   minP: number
   minPR: number
-  /** 全区间（含接嘴区）最小值，仅展示 */
+  /** 全复合区 [rFirst, R] 最小值（含极孔侧承载空档），仅作参考 */
   minPAll: number
   maxP: number
   maxPR: number
   /** t总(R)，与筒身螺旋层厚做一致性检查 */
   tAtR: number
-  /** 薄弱区（pTotal < pb 的连续 r 区间） */
+  /** 薄弱区（pTotal < pb 的连续 r 区间，判定窗口内） */
   weakZones: Array<{ from: number; to: number; min: number; minAt: number }>
   pass: boolean
   /** 样条求解失败的组（角度过大等） */
