@@ -26,6 +26,8 @@ interface Geom {
   /** 筒身段壁厚线（右侧 x） */
   wallXs: number[]
   peakTotal: { t: number; r: number; x: number; y: number }
+  /** 每组的 r0g（该组开始铺到的平行圆）与 r2b（样条→覆盖切换点）在图上的位置 */
+  marks: Array<{ angle: number; color: string; r0: [number, number]; r2b: [number, number] | null }>
   rStart: number
   /** 按实际内容定的画布宽高（避免图形周围留大片空白） */
   usedH: number
@@ -97,6 +99,19 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
   const py = top + (hAxis - hAxis * Math.sqrt(Math.max(0, 1 - (pk.r / R) ** 2))) * sc
   const bossH = Math.max(10, (tc * 2 + 6) * sc)
 
+  // 标记点：取最近格点位置 + 该处累计厚度沿法向偏移
+  const markAt = (r: number, gi: number): [number, number] => {
+    const i = Math.max(0, Math.min(N - 1, Math.round(((r - rStart) / Math.max(1e-9, R - rStart)) * (N - 1))))
+    const d = (r <= rs[i] ? cum[gi][i] : 0) + 0
+    return [Ps[i][0] + normals[i][0] * d * sc, Ps[i][1] + normals[i][1] * d * sc]
+  }
+  const marks = groups.map((g, gi) => ({
+    angle: g.angle,
+    color: angleColor(g.angle, gi),
+    r0: markAt(g.r0, gi),
+    r2b: g.r2b <= R ? markAt(g.r2b, gi) : null,
+  }))
+
   return {
     axisX,
     top,
@@ -109,13 +124,20 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
     cylBottom: eqY + Math.max(38, wall * sc * 1.15),
     wallXs: [axisX + R * sc, axisX + (R + spiralThk) * sc, axisX + (R + wall) * sc],
     peakTotal: { t: pk.tTotal, r: pk.r, x: px, y: py },
+    marks,
     rStart,
     usedH,
     usedW,
   }
 }
 
-export function DomeContour(props: { input: DesignInput; result: CheckResult; W?: number; H?: number }) {
+export interface ContourOpts {
+  layers?: boolean
+  r0Marks?: boolean
+  r2bMarks?: boolean
+}
+
+export function DomeContour(props: { input: DesignInput; result: CheckResult; W?: number; H?: number; opts?: ContourOpts }) {
   const W = props.W ?? 620
   const H = props.H ?? 420
   const g = useMemo(() => buildGeom(props.input, props.result, W, H), [props.input, props.result, W, H])
@@ -124,6 +146,7 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
   const groups = props.result.dome.groups
   const cy = props.result.cylinder
   const perRow = Math.max(3, Math.floor((VW - 90) / 54))
+  const o = { layers: true, r0Marks: true, r2bMarks: true, ...props.opts }
 
   return (
     <svg className="viz" viewBox={`0 0 ${VW} ${VH}`} role="img" aria-label="封头厚度几何轮廓">
@@ -140,9 +163,33 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
       {/* 内衬内表面 */}
       <path d={g.inner} fill="none" stroke="#94a3b8" strokeWidth="1.2" />
       {/* 各角度组外表面轮廓线（按缠绕先后堆叠，最后一组为最外层） */}
-      {g.layers.map((l) => (
-        <path key={l.angle} d={l.d} fill="none" stroke={l.color} strokeWidth="1.3" />
-      ))}
+      {o.layers &&
+        g.layers.map((l) => <path key={l.angle} d={l.d} fill="none" stroke={l.color} strokeWidth="1.3" />)}
+      {/* r0g 标记：该组开始铺到的平行圆 */}
+      {o.r0Marks &&
+        g.marks.map((mk) => (
+          <g key={`r0-${mk.angle}`}>
+            <circle cx={mk.r0[0]} cy={mk.r0[1]} r="2.6" fill="none" stroke={mk.color} strokeWidth="1.3" />
+            <text x={mk.r0[0] + 4} y={mk.r0[1] - 3} fontSize="8" fill={mk.color}>
+              {mk.angle}°r₀
+            </text>
+          </g>
+        ))}
+      {/* r2b 标记：样条 → 覆盖公式的衔接点 */}
+      {o.r2bMarks &&
+        g.marks.filter((mk) => mk.r2b).map((mk) => (
+          <g key={`r2b-${mk.angle}`}>
+            <rect
+              x={mk.r2b![0] - 2.2}
+              y={mk.r2b![1] - 2.2}
+              width="4.4"
+              height="4.4"
+              fill="#fff"
+              stroke={mk.color}
+              strokeWidth="1.3"
+            />
+          </g>
+        ))}
       {/* 封头外表面加粗 */}
       <path d={g.outer} fill="none" stroke="#1e3a5f" strokeWidth="1.7" />
       {/* 筒身段壁厚 */}
@@ -316,6 +363,7 @@ export function PressureChart(props: {
 export function DomePanel(props: { input: DesignInput; result: CheckResult; onExpand: (which: 'contour' | 'curve') => void }) {
   const { input, result } = props
   const [showExcel, setShowExcel] = useState(false)
+  const [opts, setOpts] = useState<ContourOpts>({ layers: true, r0Marks: true, r2bMarks: true })
   return (
     <div className="card">
       <h3>
@@ -328,11 +376,23 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
         <div className="pane">
           <h4>封头厚度几何轮廓</h4>
           <div className="sub">半剖 · 一层层轮廓线，与右图同源</div>
-          <DomeContour input={input} result={result} />
-          <div style={{ marginTop: 6 }}>
+          <DomeContour input={input} result={result} opts={opts} />
+          <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button className="btn sm" onClick={() => props.onExpand('contour')}>
               ⤢ 弹出大图
             </button>
+            {(
+              [
+                ['layers', '层轮廓线'],
+                ['r0Marks', 'r₀ 标记'],
+                ['r2bMarks', '2带宽衔接点'],
+              ] as Array<[keyof ContourOpts, string]>
+            ).map(([k, label]) => (
+              <label key={k} className="radios" style={{ fontSize: 11.5 }}>
+                <input type="checkbox" checked={!!opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} />
+                {label}
+              </label>
+            ))}
           </div>
         </div>
         <div className="pane">
