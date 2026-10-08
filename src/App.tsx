@@ -10,6 +10,8 @@ import { GeometryPanel } from './ui/GeometryPanel'
 import { Modal } from './ui/Modal'
 import { PRESETS } from './core/presets'
 import { autoDesign } from './core/designer'
+import { exportWorkbook } from './export/excel'
+import { MP70_STRENGTH_B, COURSE_STRENGTH_B } from './core/presets'
 import type { RefMode } from './core/types'
 
 function download(name: string, text: string, mime = 'application/json') {
@@ -26,6 +28,40 @@ export default function App() {
   const { input, result, setInput, setPreset, presetId, reset } = store
   const [expand, setExpand] = useState<'contour' | 'curve' | 'detail' | null>(null)
   const [autoMsg, setAutoMsg] = useState<string>('')
+
+  const [mode, setMode] = useState<'auto' | 'manual'>('manual')
+
+  const importJson = () => {
+    const el = document.createElement('input')
+    el.type = 'file'
+    el.accept = 'application/json,.json'
+    el.onchange = () => {
+      const f = el.files?.[0]
+      if (!f) return
+      const rd = new FileReader()
+      rd.onload = () => {
+        try {
+          const obj = JSON.parse(String(rd.result))
+          const inp = obj.input ?? obj
+          if (!inp?.geometry || !inp?.plan || !inp?.constraint) throw new Error('缺少 geometry/plan/constraint')
+          setInput(inp)
+          setAutoMsg(`已载入方案：R=${inp.geometry.R} mm、pb=${inp.requirement?.pb ?? inp.requirement?.workingPressure} MPa、${inp.plan.spiral.length} 个螺旋角组`)
+        } catch (e) {
+          setAutoMsg(`导入失败：${(e as Error).message}。需要本软件导出的方案 JSON（含 input.geometry / plan / constraint）`)
+        }
+      }
+      rd.readAsText(f)
+    }
+    el.click()
+  }
+
+  const exportExcel = () => {
+    try {
+      setAutoMsg(`已导出 Excel：${exportWorkbook(input, result)}`)
+    } catch (e) {
+      setAutoMsg(`导出失败：${(e as Error).message}`)
+    }
+  }
 
   const runAuto = () => {
     const out = autoDesign(input)
@@ -79,10 +115,26 @@ export default function App() {
           ))}
         </select>
         <div className="seg">
-          <button className="on" onClick={runAuto} title="按候选角集与约束自动生成铺层方案">
+          <button
+            className={mode === 'auto' ? 'on' : ''}
+            onClick={() => {
+              setMode('auto')
+              runAuto()
+            }}
+            title="按候选角集与约束自动生成铺层方案"
+          >
             ⚡ 自动生成
           </button>
-          <button title="直接在铺层表里改层数/角度，即时重算">手动调整</button>
+          <button
+            className={mode === 'manual' ? 'on' : ''}
+            onClick={() => {
+              setMode('manual')
+              setAutoMsg('')
+            }}
+            title="直接在铺层表里改层数/角度，即时重算"
+          >
+            手动调整
+          </button>
         </div>
         <button className="btn" onClick={reset}>
           ↺ 重置
@@ -92,9 +144,32 @@ export default function App() {
           <option value="corrected">修正版 cos²α</option>
           <option value="excel">Excel 原样复算</option>
         </select>
-        <button className="btn primary" onClick={exportJson}>
+        <button className="btn" onClick={importJson} title="读回之前导出的方案 JSON">
+          ⇪ 导入 JSON
+        </button>
+        <button className="btn" onClick={exportJson}>
           导出方案 JSON
         </button>
+        <button className="btn primary" onClick={exportExcel} title="复刻两张 Excel + 方案汇总 + 口径说明，单元格为活公式">
+          导出 Excel 报告
+        </button>
+        <button className="btn" onClick={() => window.print()} title="打印或另存为 PDF">
+          🖨 打印/PDF
+        </button>
+        <label className="cap">强度预设</label>
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value === 'mp70') setInput({ ...input, strength: { ...MP70_STRENGTH_B } })
+            else if (e.target.value === 'course') setInput({ ...input, strength: { ...COURSE_STRENGTH_B } })
+          }}
+        >
+          <option value="" disabled>
+            载入…
+          </option>
+          <option value="course">课程案例 3385 / 3385 · σc 2031</option>
+          <option value="mp70">70MPa 案例 螺旋3859/环向4342</option>
+        </select>
         <button className="btn" onClick={() => setExpand('detail')}>
           校核明细（对表 Excel）
         </button>

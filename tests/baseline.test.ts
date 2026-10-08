@@ -319,10 +319,16 @@ describe('汇总判定、薄弱区定位与对策（runCheck）', () => {
     const raw = runCheck({ ...input, refMode: 'excel' })
     expect(raw.dome.minP).toBeGreaterThan(res.dome.minP)
   })
-  it('rBossAuto：默认取最低角度组 r0 + 1 倍总带宽', () => {
+  it('rBossAuto = 全铺层覆盖起点 max(r0g)，只用铺层自身的量', () => {
     const auto = runCheck({ ...input, constraint: { ...input.constraint, rBossAuto: true } })
-    expect(auto.dome.profile[0].r).toBeCloseTo(30.128, 2)
-    expect(auto.dome.minPR).toBeGreaterThanOrEqual(50)
+    expect(auto.dome.rFirst).toBeCloseTo(30.128, 2)
+    expect(auto.dome.rFull).toBeCloseTo(122.683, 2)
+    expect(auto.dome.rBoss).toBeCloseTo(122.683, 2)
+    // 窗口下界之上，薄弱点落在近赤道，值即 r=R 处的 79.4
+    expect(auto.dome.minPR).toBeGreaterThan(150)
+    expect(auto.dome.minP).toBeLessThan(80)
+    // 极孔侧参考值仍被算出并低于判定值（判据奇异区，仅参考）
+    expect(auto.dome.minPAll).toBeLessThan(auto.dome.minP)
   })
   it('环向层不参与封头校核', () => {
     expect(res.dome.groups.every((g) => g.angle < 90)).toBe(true)
