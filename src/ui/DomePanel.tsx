@@ -9,6 +9,7 @@ import type { CheckResult, DesignInput } from '../core/types'
 import { domeAt } from '../core/dome'
 import { effectiveRBoss } from '../core/checker'
 import { angleColor } from './colors'
+import { SvgSym } from './Sym'
 
 const n = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—')
 
@@ -32,6 +33,9 @@ interface Geom {
   /** 按实际内容定的画布宽高（避免图形周围留大片空白） */
   usedH: number
   usedW: number
+  /** 图例换行：每行条目数、总行数 */
+  perRow: number
+  legendRows: number
 }
 
 function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number): Geom {
@@ -53,10 +57,10 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
   const needH = (v: number) => pad * 2 + 34 + (hAxis + maxT + v) * sc
   if (needH(wall) > H) sc = ((H - pad * 2 - 34) / (hAxis + maxT + wall)) * 0.999
   const usedW = axisX + (R + maxT + 6) * sc + labelW
-  // 图例按画布宽换行，行数计入用高
-  const perRow = Math.max(3, Math.floor((usedW - 90) / 54))
-  const legendRows = Math.ceil(groups.length / perRow)
-  const usedH = Math.min(H, needH(wall) + 24 + Math.max(0, legendRows - 1) * 13)
+  // 图例（内衬 + 各角度组）按画布宽换行，行数计入用高
+  const perRow = Math.max(3, Math.floor((usedW - 90) / 62))
+  const legendRows = Math.ceil((groups.length + 1) / perRow)
+  const usedH = Math.min(H, needH(wall) + 26 + Math.max(0, legendRows - 1) * 13)
   const top = pad + 16
   const eqY = top + hAxis * sc
 
@@ -128,6 +132,8 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
     rStart,
     usedH,
     usedW,
+    perRow,
+    legendRows,
   }
 }
 
@@ -145,16 +151,20 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
   const VW = g.usedW
   const groups = props.result.dome.groups
   const cy = props.result.cylinder
-  const perRow = Math.max(3, Math.floor((VW - 90) / 54))
   const o = { layers: true, r0Marks: true, r2bMarks: true, ...props.opts }
+
+  /** 图例条目：内衬 + 各角度组，按画布宽换行，最后一行贴着画布底边 */
+  const legend: Array<{ label: string; color: string }> = [
+    { label: '内衬', color: '#94a3b8' },
+    ...groups.map((gr, i) => ({ label: `${gr.angle}°×${gr.layers} 层`, color: angleColor(gr.angle, i) })),
+  ]
+  const legendTop = VH - 10 - (g.legendRows - 1) * 13
 
   return (
     <svg className="viz" viewBox={`0 0 ${VW} ${VH}`} role="img" aria-label="封头厚度几何轮廓">
       {/* 旋转轴 */}
-      <line x1={g.axisX} y1={g.cylBottom} x2={g.axisX} y2={8} stroke="#cbd5e1" strokeDasharray="5,4" />
-      <text x={g.axisX - 4} y={g.cylBottom + 12} fontSize="9" fill="#94a3b8" textAnchor="end">
-        旋转轴
-      </text>
+      <line x1={g.axisX} y1={g.cylBottom} x2={g.axisX} y2={16} stroke="#cbd5e1" strokeDasharray="5,4" />
+      <SvgSym x={g.axisX} y={10} t="旋转轴" fs={9} fill="#94a3b8" anchor="middle" halo />
       {/* 金属接嘴 / 极孔 */}
       <rect x={g.boss.x} y={g.boss.y} width={g.boss.w} height={g.boss.h} fill="#cbd5e1" stroke="#94a3b8" />
       <text x={g.boss.x + g.boss.w + 6} y={g.boss.y + 10} fontSize="10" fill="#64748b">
@@ -165,17 +175,12 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
       {/* 各角度组外表面轮廓线（按缠绕先后堆叠，最后一组为最外层） */}
       {o.layers &&
         g.layers.map((l) => <path key={l.angle} d={l.d} fill="none" stroke={l.color} strokeWidth="1.3" />)}
-      {/* r0g 标记：该组开始铺到的平行圆 */}
+      {/* 起铺点：该组开始铺到的平行圆（只画记号，文字交给图例，避免挤在一起） */}
       {o.r0Marks &&
         g.marks.map((mk) => (
-          <g key={`r0-${mk.angle}`}>
-            <circle cx={mk.r0[0]} cy={mk.r0[1]} r="2.6" fill="none" stroke={mk.color} strokeWidth="1.3" />
-            <text x={mk.r0[0] + 4} y={mk.r0[1] - 3} fontSize="8" fill={mk.color}>
-              {mk.angle}°r₀
-            </text>
-          </g>
+          <circle key={`r0-${mk.angle}`} cx={mk.r0[0]} cy={mk.r0[1]} r="2.8" fill="#fff" stroke={mk.color} strokeWidth="1.4" />
         ))}
-      {/* r2b 标记：样条 → 覆盖公式的衔接点 */}
+      {/* 样条 → 覆盖公式的衔接点 */}
       {o.r2bMarks &&
         g.marks.filter((mk) => mk.r2b).map((mk) => (
           <g key={`r2b-${mk.angle}`}>
@@ -201,32 +206,26 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
         赤道 r=R
       </text>
       <text x={g.axisX + 6} y={g.cylBottom - 5} fontSize="9.5" fill="#475569">
-        筒身段续 → 螺旋 {n(cy.spiralThickness)}＋环向 {n(cy.hoopThickness)} mm
-      </text>
-      <text x={g.axisX + 6} y={g.top + 14} fontSize="9.5" fill="#475569">
-        封头（半剖）
+        接筒身段：螺旋 {n(cy.spiralThickness)}＋环向 {n(cy.hoopThickness)} mm
       </text>
       {/* 峰值标注 */}
-      <text x={Math.min(VW - 176, g.peakTotal.x + 12)} y={Math.max(14, g.peakTotal.y - 3)} fontSize="10" fontWeight="bold" fill="#1e3a5f">
-        厚度峰值 {n(g.peakTotal.t)} mm @ r≈{n(g.peakTotal.r, 0)}
+      <text x={Math.min(VW - 176, g.peakTotal.x + 12)} y={Math.max(24, g.peakTotal.y - 3)} fontSize="10" fontWeight="bold" fill="#1e3a5f">
+        最厚 {n(g.peakTotal.t)} mm @ r≈{n(g.peakTotal.r, 0)}
       </text>
-      {/* 图例：按画布宽自动换行 */}
+      {/* 图例 */}
       <g fontSize="9.5" fill="#475569">
-        <line x1={16} y1={VH - 10} x2={32} y2={VH - 10} stroke="#94a3b8" strokeWidth="2" />
-        <text x={36} y={VH - 7}>
-          内衬
-        </text>
-        {groups.map((gr, i) => (
-          <g key={gr.angle} transform={`translate(${64 + (i % perRow) * 54},${Math.floor(i / perRow) * 13})`}>
-            <line x1={0} y1={VH - 10} x2={16} y2={VH - 10} stroke={angleColor(gr.angle, i)} strokeWidth="2" />
-            <text x={20} y={VH - 7}>
-              {gr.angle}°×{gr.layers}
-            </text>
-          </g>
-        ))}
-        <text x={64 + (groups.length % perRow) * 54 + 4} y={VH - 7 + Math.floor(groups.length / perRow) * 13} fill="#94a3b8">
-          轮廓线=各层外表面（按缠绕先后）
-        </text>
+        {legend.map((it, i) => {
+          const x = 16 + (i % g.perRow) * 62
+          const y = legendTop + Math.floor(i / g.perRow) * 13
+          return (
+            <g key={it.label}>
+              <line x1={x} y1={y} x2={x + 14} y2={y} stroke={it.color} strokeWidth="2" />
+              <text x={x + 18} y={y + 3}>
+                {it.label}
+              </text>
+            </g>
+          )
+        })}
       </g>
     </svg>
   )
@@ -267,8 +266,8 @@ export function PressureChart(props: {
     )
   }, [props.showExcel, prof, pMax, W, H])
 
-  const rTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => rStart + t * (R - rStart))
-  const pTicks = [0, 0.25, 0.5, 0.75, 1].map((t) => t * pMax)
+  const rTicks = [0, 0.25, 0.5, 0.75].map((t) => rStart + t * (R - rStart))
+  const pTicks = [0, 0.25, 0.5, 0.75].map((t) => t * pMax)
   const hp = hover === null ? null : domeAt(dome.groups, hover, R, derived.sigmaComposite, input.requirement.ks, input.refMode)
 
   return (
@@ -291,11 +290,11 @@ export function PressureChart(props: {
         fill="#94a3b8"
         opacity="0.13"
       />
-      <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={H - pad.b - 10} fontSize="9" fill="#64748b" textAnchor="middle">
+      <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={pad.t + 12} fontSize="9" fill="#64748b" textAnchor="middle">
         极孔侧
       </text>
-      <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={H - pad.b + 1} fontSize="9" fill="#64748b" textAnchor="middle">
-        部分覆盖·仅参考
+      <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={pad.t + 24} fontSize="9" fill="#64748b" textAnchor="middle">
+        部分角度铺到
       </text>
       {dome.weakZones.map((z, i) => (
         <rect key={i} x={X(z.from)} y={Y(pb)} width={Math.max(1.5, X(z.to) - X(z.from))} height={Y(0) - Y(pb)} fill="#dc2626" opacity="0.16" />
@@ -319,18 +318,18 @@ export function PressureChart(props: {
       <text x={W / 2} y={H - 4} fontSize="10.5" fill="#64748b" textAnchor="middle">
         平行圆半径 r (mm)
       </text>
-      <text x={6} y={pad.t - 5} fontSize="10" fill="#94a3b8">
-        MPa
+      <text x={12} y={(pad.t + H - pad.b) / 2} fontSize="10" fill="#94a3b8" textAnchor="middle" transform={`rotate(-90 12 ${(pad.t + H - pad.b) / 2})`}>
+        爆破压强 (MPa)
       </text>
       <line x1={pad.l} y1={Y(pb)} x2={W - pad.r} y2={Y(pb)} stroke="#dc2626" strokeWidth="1.5" strokeDasharray="6,4" />
       <text x={W - pad.r - 2} y={Y(pb) - 5} fontSize="10" fill="#dc2626" fontWeight="bold" textAnchor="end">
-        设计爆压 {n(pb, 1)}
+        目标爆压 {n(pb, 1)}
       </text>
       {props.showExcel && <path d={excelCurve} fill="none" stroke="#64748b" strokeWidth="1.6" strokeDasharray="5,3" />}
       <path d={curve} fill="none" stroke="#b91c1c" strokeWidth="2.4" strokeLinejoin="round" />
       <circle cx={X(dome.minPR)} cy={Y(dome.minP)} r="4" fill="#fff" stroke="#b91c1c" strokeWidth="2" />
       <text x={X(dome.minPR)} y={Y(dome.minP) - 10} fontSize="10" fill="#b91c1c" textAnchor="middle">
-        min {n(dome.minP, 1)} @ r≈{n(dome.minPR, 0)}
+        最低 {n(dome.minP, 1)} @ r≈{n(dome.minPR, 0)}
       </text>
       <circle cx={X(R)} cy={Y(prof.length ? prof[prof.length - 1].pTotal : 0)} r="3" fill="#b91c1c" />
       {hp && (
@@ -340,17 +339,17 @@ export function PressureChart(props: {
           <g transform={`translate(${Math.min(W - 180, Math.max(pad.l, X(hp.r) + 10))},${pad.t + 6})`}>
             <rect width="170" height={50 + hp.pGroups.length * 11} rx="5" fill="#0f172a" opacity="0.9" />
             <text x="8" y="15" fontSize="10.5" fill="#fff">
-              r = {n(hp.r, 1)} mm　t总 = {n(hp.tTotal)} mm
+              r = {n(hp.r, 1)} mm　总厚 = {n(hp.tTotal)} mm
             </text>
             <text x="8" y="29" fontSize="10.5" fill="#fca5a5">
-              p总×ks = {n(hp.pTotal)} MPa（未乘 {n(hp.pSum)}）
+              此处爆压 = {n(hp.pTotal)} MPa（乘系数前 {n(hp.pSum)}）
             </text>
             <text x="8" y="42" fontSize="9.5" fill="#cbd5e1">
-              判定窗口 {n(rBoss, 1)} ≤ r ≤ {n(R, 1)}
+              判定范围 {n(rBoss, 1)} ≤ r ≤ {n(R, 1)}
             </text>
             {hp.pGroups.map((p, i) => (
               <text key={i} x="8" y={54 + i * 11} fontSize="9.5" fill={angleColor(dome.groups[i].angle, i)}>
-                {dome.groups[i].angle}°: t={n(hp.tGroups[i], 3)} p={n(p, 1)}
+                {dome.groups[i].angle}°：厚 {n(hp.tGroups[i], 3)} mm、爆压 {n(p, 1)} MPa
               </text>
             ))}
           </g>
@@ -367,25 +366,25 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
   return (
     <div className="card">
       <h3>
-        封头校核 — 缠绕规律厚度与承载（逐角度组）
+        封头校核 — 各层厚度沿母线的变化与承载
         <span className="tail">
-          {input.refMode === 'corrected' ? '修正 cos²α' : 'Excel 原样'} · ks={input.requirement.ks}
+          {input.refMode === 'corrected' ? '封头算法：正确算法' : '封头算法：参考表原算法'} · 平衡系数 {input.requirement.ks}
         </span>
       </h3>
       <div className="dome">
         <div className="pane">
-          <h4>封头厚度几何轮廓</h4>
-          <div className="sub">半剖 · 一层层轮廓线，与右图同源</div>
+          <h4>封头厚度轮廓（半剖）</h4>
+          <div className="sub">每条彩线是一层的外表面，按缠绕先后由内向外堆叠</div>
           <DomeContour input={input} result={result} opts={opts} />
-          <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="pane-actions">
             <button className="btn sm" onClick={() => props.onExpand('contour')}>
               放大
             </button>
             {(
               [
-                ['layers', '层轮廓线'],
-                ['r0Marks', 'r₀ 标记'],
-                ['r2bMarks', '2带宽衔接点'],
+                ['layers', '各层轮廓线'],
+                ['r0Marks', '起铺点标记'],
+                ['r2bMarks', '样条衔接点'],
               ] as Array<[keyof ContourOpts, string]>
             ).map(([k, label]) => (
               <label key={k} className="radios" style={{ fontSize: 11.5 }}>
@@ -396,16 +395,16 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
           </div>
         </div>
         <div className="pane">
-          <h4>封头爆破压强 p总(r) × ks = {input.requirement.ks}</h4>
-          <div className="sub">灰=极孔侧部分覆盖（判据奇异，仅参考）· 悬停看逐组分解</div>
+          <h4>封头沿母线的爆破压强分布</h4>
+          <div className="sub">已乘应力平衡系数；灰色段只有一部分角度铺到，只列示不判定。悬停看各层分解</div>
           <PressureChart input={input} result={result} showExcel={showExcel} />
-          <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="pane-actions">
             <button className="btn sm" onClick={() => props.onExpand('curve')}>
               放大
             </button>
             <label className="radios" style={{ fontSize: 11.5 }}>
               <input type="checkbox" checked={showExcel} onChange={(e) => setShowExcel(e.target.checked)} />
-              叠加 Excel 原样口径（灰虚线）
+              叠加参考表原算法（灰虚线，仅对账）
             </label>
           </div>
         </div>

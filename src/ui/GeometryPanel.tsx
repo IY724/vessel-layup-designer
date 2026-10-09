@@ -1,10 +1,12 @@
 /**
- * GeometryPanel.tsx — 几何板块（容积↔尺寸互算、内胆轮廓、线型切点校验、Ⅳ型瓶接头尺寸）
+ * GeometryPanel.tsx — 几何板块（容积↔尺寸互算、内胆轮廓、缠绕线型切点、瓶口/接头尺寸）
  *
- * 初值从当前铺层输入带过来（R、缠绕极孔 r₀、封头短半轴 → λ），之后各填各的：
- * 几何用**内表面半径 R_in**，铺层用**缠绕层受力半径 R**，插件里两者也是分开的。
+ * 初值从当前铺层输入带过来（R、缠绕极孔 r₀、封头深度 → 轴比 λ），之后各填各的：
+ * 几何用**内胆外表面半径 R_in**，铺层用**缠绕层受力半径 R**，两者是不同的量。
+ * 公式与取值来源写在 docs/DESIGN.md，界面只讲怎么用。
  */
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { CheckResult, DesignInput } from '../core/types'
 import {
   PLUGIN_JOINT_DEFAULT,
@@ -14,7 +16,6 @@ import {
   geometryChecks,
   headMinorAxis,
   lambdaFromDepth,
-  lineTypeTable,
   matchLineType,
   meridianProfile,
   solveGeometry,
@@ -24,10 +25,11 @@ import {
   type VolumeParams,
 } from '../core/geometry'
 import { effectiveRBoss } from '../core/checker'
+import { SvgSym, sym } from './Sym'
 
 const f = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—')
 
-function N(props: { label: string; value: number; onChange: (v: number) => void; unit?: string; step?: number }) {
+function N(props: { label: ReactNode; value: number; onChange: (v: number) => void; unit?: ReactNode; step?: number }) {
   return (
     <div className="field">
       <span className="lbl">{props.label}</span>
@@ -42,7 +44,7 @@ function N(props: { label: string; value: number; onChange: (v: number) => void;
   )
 }
 
-/** 内胆内表面纵剖面（半剖）：筒身 + 半椭球封头 + 极孔/接头区半径标记 */
+/** 内胆纵剖面（半剖）：筒身 + 半椭球封头 + 瓶口区各半径的位置。标签放在左侧留出的空栏里，避免压图 */
 function LinerSection(props: { vp: VolumeParams; joint: JointParams }) {
   const { vp, joint } = props
   const W = 620
@@ -51,52 +53,63 @@ function LinerSection(props: { vp: VolumeParams; joint: JointParams }) {
   const R_out = joint.R_in + joint.t1
   const maxR = Math.max(vp.R_in, R_out) + 8
   const span = vp.l / 2 + headMinorAxis(vp) + 40
-  const sc = Math.min((W / 2 - 60) / span, (H - 46) / maxR)
-  const cx = 30
-  const mid = H - 34
+  const gutter = 100
+  const sc = Math.min((W - gutter - 78) / span, (H - 46) / maxR)
+  const cx = gutter
+  const mid = H - 30
   const X = (y: number) => cx + (y + vp.l / 2) * sc
   const Y = (r: number) => mid - r * sc
 
   const head = prof.map((p) => `${X(vp.l / 2 + p.z).toFixed(1)},${Y(p.r).toFixed(1)}`).join(' L')
-  const boss = [
-    { r: joint.r0, label: `r₀ ${joint.r0}`, c: '#64748b' },
-    { r: joint.r0 + joint.t4, label: `r_n ${joint.r0 + joint.t4}`, c: '#0891b2' },
-    { r: joint.r_f, label: `r_f ${joint.r_f}`, c: '#7c3aed' },
-    { r: joint.r_c, label: `r_c ${joint.r_c}`, c: '#db2777' },
-    { r: joint.r_sp, label: `r_sp ${joint.r_sp}`, c: '#ca8a04' },
+  const xEnd = X(vp.l / 2 + headMinorAxis(vp))
+  const marks = [
+    { r: joint.r0, label: `通孔 r₀ ${joint.r0}`, c: '#475569' },
+    { r: joint.r0 + joint.t4, label: `颈根 r_n ${joint.r0 + joint.t4}`, c: '#0891b2' },
+    { r: joint.r_f, label: `粘结环 r_f ${joint.r_f}`, c: '#7c3aed' },
+    { r: joint.r_c, label: `回折壁 r_c ${joint.r_c}`, c: '#db2777' },
+    { r: joint.r_sp, label: `分界 r_sp ${joint.r_sp}`, c: '#ca8a04' },
   ]
-  const rCl = vp.r0 // 铺层模型里的"缠绕极孔半径"就是 Clairaut 常数 R·sinα₀
+  // 半径挨得近时标签会叠字：自下而上强制 11 px 最小间距，虚线仍画在真实高度
+  const gap = 13
+  const fromBottom = marks.map((_, i) => i).sort((a, b) => Y(marks[a].r) - Y(marks[b].r)).reverse()
+  const labelY: number[] = new Array(marks.length)
+  fromBottom.forEach((m, k) => {
+    const real = Y(marks[m].r) - 2
+    labelY[m] = k === 0 ? real : Math.min(real, labelY[fromBottom[k - 1]] - gap)
+  })
   return (
     <svg className="viz" viewBox={`0 0 ${W} ${H}`}>
-      <line x1={cx} y1={12} x2={W - 10} y2={12} stroke="#cbd5e1" strokeDasharray="5,4" />
-      <text x={cx + 2} y={22} fontSize="9" fill="#94a3b8">
+      {/* 旋转轴 */}
+      <line x1={6} y1={14} x2={W - 8} y2={14} stroke="#cbd5e1" strokeDasharray="5,4" />
+      <text x={W - 10} y={11} fontSize="9" fill="#94a3b8" textAnchor="end">
         旋转轴
       </text>
-      {/* 筒身内壁 */}
-      <line x1={X(-vp.l / 2)} y1={Y(vp.R_in)} x2={X(vp.l / 2)} y2={Y(vp.R_in)} stroke="#1e3a5f" strokeWidth="1.6" />
-      {/* 封头内表面 */}
-      <path d={`M${head}`} fill="none" stroke="#1e3a5f" strokeWidth="1.6" />
-      {/* 外表面（壁厚 t1） */}
-      <line x1={X(-vp.l / 2)} y1={Y(R_out)} x2={X(vp.l / 2)} y2={Y(R_out)} stroke="#94a3b8" strokeWidth="1.1" />
-      {/* 极孔端面 */}
-      <line x1={X(vp.l / 2 + headMinorAxis(vp))} y1={Y(joint.r0)} x2={X(vp.l / 2 + headMinorAxis(vp))} y2={Y(R_out)} stroke="#64748b" strokeWidth="1.2" />
-      {boss.map((b, i) => (
-        <g key={b.r}>
-          <line x1={X(-vp.l / 2 - 14)} y1={Y(b.r)} x2={X(vp.l / 2 + 6)} y2={Y(b.r)} stroke={b.c} strokeWidth="0.8" strokeDasharray="3,3" opacity="0.75" />
-          <text x={cx + 4} y={20 + i * 11} fontSize="9" fill={b.c}>
-            {b.label}
-          </text>
+      {/* 瓶口区各半径：水平虚线 + 左侧标签 */}
+      {marks.map((b, i) => (
+        <g key={b.label}>
+          <line x1={gutter - 4} y1={Y(b.r)} x2={xEnd} y2={Y(b.r)} stroke={b.c} strokeWidth="0.8" strokeDasharray="3,3" opacity="0.7" />
+          {Math.abs(labelY[i] - (Y(b.r) - 2)) > 1 && (
+            <line x1={gutter - 4} y1={Y(b.r)} x2={gutter - 10} y2={labelY[i] + 2} stroke={b.c} strokeWidth="0.6" opacity="0.5" />
+          )}
+          <SvgSym x={6} y={labelY[i]} t={b.label} fs={9} fill={b.c} halo />
         </g>
       ))}
-      <line x1={X(vp.l / 2)} y1={Y(0) - 4} x2={X(vp.l / 2)} y2={Y(maxR)} stroke="#cbd5e1" strokeDasharray="4,4" />
+      {/* 筒身内壁 / 外壁 */}
+      <line x1={X(-vp.l / 2)} y1={Y(vp.R_in)} x2={X(vp.l / 2)} y2={Y(vp.R_in)} stroke="#1e3a5f" strokeWidth="1.6" />
+      <line x1={X(-vp.l / 2)} y1={Y(R_out)} x2={X(vp.l / 2)} y2={Y(R_out)} stroke="#94a3b8" strokeWidth="1.1" />
+      {/* 封头内表面 */}
+      <path d={`M${head}`} fill="none" stroke="#1e3a5f" strokeWidth="1.6" />
+      {/* 极孔端面 */}
+      <line x1={xEnd} y1={Y(joint.r0)} x2={xEnd} y2={Y(R_out)} stroke="#475569" strokeWidth="1.2" />
+      <line x1={X(vp.l / 2)} y1={mid} x2={X(vp.l / 2)} y2={Y(maxR)} stroke="#cbd5e1" strokeDasharray="4,4" />
       <text x={X(vp.l / 2) + 3} y={Y(maxR) + 8} fontSize="9" fill="#94a3b8">
         赤道
       </text>
-      <text x={X(vp.l / 2 + headMinorAxis(vp)) + 4} y={Y(joint.r0) - 4} fontSize="9" fill="#64748b">
+      <text x={xEnd + 4} y={Y(joint.r0) + 3} fontSize="9" fill="#475569">
         极孔端面
       </text>
-      <text x={cx + 4} y={20 + boss.length * 11 + 2} fontSize="9" fill="#b91c1c">
-        缠绕极孔 r_cl={f(rCl, 1)}（=R_out·sinα₀）≠ 通孔 r₀={joint.r0}
+      <text x={gutter} y={H - 10} fontSize="9" fill="#94a3b8">
+        筒身段（内壁与外壁）
       </text>
     </svg>
   )
@@ -132,32 +145,33 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
     <>
       <div className="card">
         <h3>
-          <span className="n">7</span>
-          几何板块 — 容积↔尺寸互算与内胆轮廓
-          <span className="tail">朱宁式(2.6/2.7) · 半椭球封头 · Ⅳ型瓶口径</span>
+          几何板块 — 容积与尺寸互算
+          <span className="tail">半椭球封头 · 填三个量解第四个</span>
         </h3>
         <div className="dome">
           <div className="pane">
             <div className="field">
-              <span className="lbl">求解目标</span>
+              <span className="lbl">要求</span>
               <select value={unknown} onChange={(e) => setUnknown(e.target.value as UnknownField)}>
-                <option value="none">正算容积</option>
-                <option value="l">已知容积 → 反算筒身长度 l</option>
-                <option value="R_in">已知容积 → 反算筒身内半径 R_in</option>
-                <option value="lambda">已知容积 → 反算封头轴比 λ</option>
+                <option value="none">按尺寸算容积</option>
+                <option value="l">已知容积，反算筒身长度</option>
+                <option value="R_in">已知容积，反算筒身内半径</option>
+                <option value="lambda">已知容积，反算封头轴比</option>
               </select>
               <span className="unit" />
             </div>
             {unknown !== 'none' && <N label="目标容积" value={targetL} unit="L" step={1} onChange={setTargetL} />}
-            <N label="筒身内半径 R_in（=D/2−t）" value={vp.R_in} unit="mm" step={0.5} onChange={(v) => set({ R_in: v })} />
+            <N label={sym('筒身内半径 R_in（=D/2−t）')} value={vp.R_in} unit="mm" step={0.5} onChange={(v) => set({ R_in: v })} />
             <N label="筒身段长度 l" value={vp.l} unit="mm" step={10} onChange={(v) => set({ l: v })} />
-            <N label="封头轴比 λ = a/b" value={Number(vp.lambda.toFixed(3))} step={0.01} onChange={(v) => set({ lambda: v })} />
-            <N label="极孔半径 r₀（物理孔径）" value={vp.r0} unit="mm" step={0.5} onChange={(v) => set({ r0: v })} />
-            <N label="阀座容积折减 K_f" value={vp.Kf} step={0.05} onChange={(v) => set({ Kf: v })} />
+            <N label={sym('封头轴比 λ = a/b')} value={Number(vp.lambda.toFixed(3))} step={0.01} onChange={(v) => set({ lambda: v })} />
+            <N label="极孔半径 r₀（阀座通孔）" value={vp.r0} unit="mm" step={0.5} onChange={(v) => set({ r0: v })} />
+            <N label={sym('阀座容积折减 K_f')} value={vp.Kf} step={0.05} onChange={(v) => set({ Kf: v })} />
             <div className="hint">
-              封头深度 b = R_in/λ = <b>{f(headMinorAxis(vp))}</b> mm（Excel 表 C14「封头短半轴」就是这个量）
-              <br />
-              R_in 是内胆外表面半径，与铺层设计里的缠绕层受力半径 R（当前 {R} mm）不是同一个量
+              {sym('封头深度 b = R_in / λ = ')}
+              <b>{f(headMinorAxis(vp))}</b>
+              {sym(' mm。这里的 R_in 是内胆外表面半径，与铺层设计里的缠绕层受力半径 R（当前 ')}
+              {R}
+              {sym(' mm）不是同一个量。')}
             </div>
             <div className="derived">
               <div>
@@ -165,54 +179,69 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
                 <b>{f(computeVolume(solved.params).totalL, 3)} L</b>
               </div>
               {unknown !== 'none' && (
-                <div style={{ color: solved.ok ? '#15803d' : '#b91c1c' }}>
-                  {solved.ok ? solved.solved : `无解：${solved.solved}`}
-                </div>
+                <div className={solved.ok ? '' : 'bad'}>{solved.ok ? solved.solved : `无解：${solved.solved}`}</div>
               )}
             </div>
-            {hints.map((c) => (
-              <div key={c.text} className={`banner ${c.level === 'ok' ? 'ok' : ''}`} style={{ marginTop: 6 }}>
-                {c.level === 'ok' ? '' : '注意：'}
-                <div>{c.text}</div>
-              </div>
-            ))}
+            <div className="checks">
+              {hints.map((c) => (
+                <div key={c.text} className={c.level}>
+                  <i>{c.level === 'ok' ? '✓' : '!'}</i>
+                  <span>{c.text}</span>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="pane">
+            <h4>内胆纵剖面（半剖）</h4>
+            <div className="sub">左侧标出瓶口区各半径的高度位置</div>
             <LinerSection vp={shown} joint={joint} />
+            <div className="hint warn" style={{ marginTop: 6 }}>
+              {sym('缠绕极孔 r_cl = R_out·sinα₀ = ')}
+              <b>{f(jd.rCl, 1)}</b>
+              {sym(' mm，与阀座通孔 r₀ = ')}
+              <b>{joint.r0}</b>
+              {sym(' mm 是两个不同的量：前者决定纤维铺到哪里，后者是瓶口的物理孔径。')}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="card">
         <h3>
-          <span className="n">8</span>
-          线型缠绕切点校验与Ⅳ型瓶接头尺寸
-          <span className="tail">郑强表2-1 · 插件 kernel 口径</span>
+          缠绕线型与瓶口尺寸
+          <span className="tail">切点校验 · Ⅳ型瓶瓶口区</span>
         </h3>
         <div className="dome">
           <div className="pane">
-            <b style={{ color: '#1e3a5f' }}>单程/双程转角（郑强式2-4）</b>
-            <div className="derived" style={{ marginTop: 6 }}>
-              <div>α₀ = arcsin(r₀/R_in) = <b>{f(turns.alpha0Deg, 3)}°</b></div>
-              <div>γ（筒身段）= <b>{f(turns.gamma)}</b>°　β（封头段）= <b>{f(turns.beta)}</b>°</div>
-              <div>单程 θ′_t = <b>{f(turns.oneWay)}</b>°　双程 θ′_n = <b>{f(turns.roundTrip)}</b>°</div>
+            <h4>单程 / 双程缠绕转角</h4>
+            <div className="sub">按筒身长度与极孔半径算出转角，再与线型表比对</div>
+            <div className="derived">
+              <div>
+                {sym('α₀ = arcsin(r₀/R_in)')} = <b>{f(turns.alpha0Deg, 3)}°</b>
+              </div>
+              <div>
+                筒身段转角 γ = <b>{f(turns.gamma)}</b>°　封头段转角 β = <b>{f(turns.beta)}</b>°
+              </div>
+              <div>
+                {sym('单程 θ_t')} = <b>{f(turns.oneWay)}</b>°　{sym('双程 θ_n')} = <b>{f(turns.roundTrip)}</b>°
+              </div>
             </div>
             <div className="tablewrap" style={{ maxHeight: 170, marginTop: 8 }}>
               <table className="grid">
                 <thead>
                   <tr>
-                    <th>θ = 360°(m+K/n)</th>
+                    <th>线型转角 θ</th>
                     <th>切点数 n</th>
                     <th>K</th>
                     <th>m</th>
-                    <th>与 θ′_n 偏差</th>
+                    <th>与双程转角差</th>
                   </tr>
                 </thead>
                 <tbody>
                   {matches.length === 0 && (
                     <tr>
                       <td colSpan={5} className="bad">
-                        ±45° 内无线型解：需调整筒身长度或缠绕角（可放宽匹配窗口）
+                        ±45° 内没有可用的线型解：需调整筒身长度或缠绕角
                       </td>
                     </tr>
                   )}
@@ -232,72 +261,69 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
               </table>
             </div>
             <div className="hint">
-              选表原则：切点少者优（极孔架空与应力集中小）。表由 θ=360°(m+K/n) 生成，
-              与郑强表2-1 逐格核对；朱宁引用的 n=4、θ_n=630° 即 m=1、K=3。
-              线型表共 {lineTypeTable().length} 格。
+              选表原则：切点数少者优先（极孔处不易架空、应力集中小）。θ = 360°(m + K/n)。
             </div>
           </div>
           <div className="pane">
-            <b style={{ color: '#1e3a5f' }}>Ⅳ型瓶接头尺寸（插件默认值可改）</b>
-            <div className="kv" style={{ marginTop: 6 }}>
-              <N label="分界半径 r_sp" value={joint.r_sp} unit="mm" onChange={(v) => setJ({ r_sp: v })} />
-              <N label="粘结界面环 r_f" value={joint.r_f} unit="mm" onChange={(v) => setJ({ r_f: v })} />
-              <N label="回折壁半径 r_c" value={joint.r_c} unit="mm" onChange={(v) => setJ({ r_c: v })} />
+            <h4>瓶口区尺寸</h4>
+            <div className="sub">常用取值已预填，全部可改</div>
+            <div className="fields2">
+              <N label={sym('分界半径 r_sp')} value={joint.r_sp} unit="mm" onChange={(v) => setJ({ r_sp: v })} />
+              <N label={sym('粘结界面环 r_f')} value={joint.r_f} unit="mm" onChange={(v) => setJ({ r_f: v })} />
+              <N label={sym('回折壁半径 r_c')} value={joint.r_c} unit="mm" onChange={(v) => setJ({ r_c: v })} />
               <N label="阀座通孔 r₀" value={joint.r0} unit="mm" onChange={(v) => setJ({ r0: v })} />
-              <N label="颈壁厚 t₄" value={joint.t4} unit="mm" onChange={(v) => setJ({ t4: v })} />
-              <N label="界面圆角 R_if" value={joint.R_if} unit="mm" onChange={(v) => setJ({ R_if: v })} />
-              <N label="内肩外圆角 R_so" value={joint.R_so} unit="mm" onChange={(v) => setJ({ R_so: v })} />
-              <N label="内肩内圆角 R_si" value={joint.R_si} unit="mm" onChange={(v) => setJ({ R_si: v })} />
-              <N label="环端面偏移 l_tip" value={joint.l_tip} unit="mm" onChange={(v) => setJ({ l_tip: v })} />
-              <N label="颈圆角 R_nf" value={joint.R_nf} unit="mm" onChange={(v) => setJ({ R_nf: v })} />
-              <N label="孔底圆角 R_bf" value={joint.R_bf} unit="mm" onChange={(v) => setJ({ R_bf: v })} />
-              <N label="直筒壁厚 t₁" value={joint.t1} unit="mm" onChange={(v) => setJ({ t1: v })} />
-              <N label="直筒长 l₁" value={joint.l1} unit="mm" onChange={(v) => setJ({ l1: v })} />
+              <N label={sym('颈壁厚 t_4')} value={joint.t4} unit="mm" onChange={(v) => setJ({ t4: v })} />
+              <N label={sym('界面圆角 R_if')} value={joint.R_if} unit="mm" onChange={(v) => setJ({ R_if: v })} />
+              <N label={sym('内肩外圆角 R_so')} value={joint.R_so} unit="mm" onChange={(v) => setJ({ R_so: v })} />
+              <N label={sym('内肩内圆角 R_si')} value={joint.R_si} unit="mm" onChange={(v) => setJ({ R_si: v })} />
+              <N label={sym('环端面偏移 l_tip')} value={joint.l_tip} unit="mm" onChange={(v) => setJ({ l_tip: v })} />
+              <N label={sym('颈圆角 R_nf')} value={joint.R_nf} unit="mm" onChange={(v) => setJ({ R_nf: v })} />
+              <N label={sym('孔底圆角 R_bf')} value={joint.R_bf} unit="mm" onChange={(v) => setJ({ R_bf: v })} />
+              <N label={sym('直筒壁厚 t_1')} value={joint.t1} unit="mm" onChange={(v) => setJ({ t1: v })} />
+              <N label={sym('直筒长 l_1')} value={joint.l1} unit="mm" onChange={(v) => setJ({ l1: v })} />
               <N label="端面间距 L" value={joint.L} unit="mm" onChange={(v) => setJ({ L: v })} />
             </div>
             <div className="derived">
               <div>
-                R_out=<b>{f(jd.R_out, 1)}</b>　r_n=<b>{f(jd.r_n, 1)}</b>　y_eq=<b>{f(jd.y_eq, 1)}</b>　H=<b>{f(jd.H, 1)}</b>
+                {sym('外半径 R_out')} = <b>{f(jd.R_out, 1)}</b>　{sym('颈根半径 r_n')} = <b>{f(jd.r_n, 1)}</b>　接头高度 H ={' '}
+                <b>{f(jd.H, 1)}</b> mm
               </div>
               <div>
-                z_28=<b>{f(jd.z_28, 1)}</b>　z_35=<b>{f(jd.z_35, 1)}</b>　封头分界深度 z_sp=<b>{f(jd.z_sp)}</b> mm
+                颈直段 = <b>{f(jd.neckStraight)}</b> mm　内肩直段 = <b>{f(jd.shoulderFlat, 1)}</b> mm　封头分界深度{' '}
+                {sym('z_sp')} = <b>{f(jd.z_sp)}</b> mm
               </div>
               <div>
-                颈直段=<b>{f(jd.neckStraight)}</b> mm（yc={f(jd.yc)} 由 R_nf 相切数值求解）　内肩直段=<b>{f(jd.shoulderFlat, 1)}</b> mm
-              </div>
-              <div style={{ color: '#b91c1c' }}>
-                缠绕极孔 r_cl=<b>{f(jd.rCl, 2)}</b> mm ≠ 通孔 r₀=<b>{joint.r0}</b> mm；接头覆盖到 r_sp=<b>{joint.r_sp}</b> mm
+                {sym('缠绕极孔 r_cl')} = <b>{f(jd.rCl, 2)}</b> mm　阀座通孔 r₀ = <b>{joint.r0}</b> mm　接头覆盖到{' '}
+                {sym('r_sp')} = <b>{joint.r_sp}</b> mm
               </div>
               <div>
-                判定窗口下界取<b>铺层自身的量</b>：全铺层覆盖起点 max(r0g) = <b>{f(result.dome.rFull, 1)}</b> mm（当前生效{' '}{f(effectiveRBoss(input), 1)} mm）；
-                复合层最小平行圆 r_cl={f(jd.rCl, 1)}、接头分界 r_sp={joint.r_sp} 仅作对照，不参与判定
+                封头参与判定的范围取铺层自身的量：所有角度都铺到的最小平行圆 = <b>{f(result.dome.rFull, 1)}</b> mm（当前生效{' '}
+                {f(effectiveRBoss(input), 1)} mm）
               </div>
             </div>
             <div className="tablewrap" style={{ maxHeight: 200, marginTop: 8 }}>
               <table className="grid">
                 <thead>
                   <tr>
-                    <th>约束</th>
-                    <th>判定</th>
+                    <th>检查项</th>
+                    <th>结果</th>
                     <th style={{ textAlign: 'left' }}>数值</th>
-                    <th>出处</th>
                   </tr>
                 </thead>
                 <tbody>
                   {checks.map((c) => (
                     <tr key={c.name + c.text}>
-                      <td>{c.name}</td>
+                      <td>{sym(c.name)}</td>
                       <td className={c.ok ? 'ok' : 'bad'}>{c.ok ? '通过' : '不通过'}</td>
-                      <td style={{ textAlign: 'left', whiteSpace: 'normal', fontSize: 11 }}>{c.text}</td>
-                      <td className="tag">{c.src}</td>
+                      <td style={{ textAlign: 'left', whiteSpace: 'normal', fontSize: 11 }}>{sym(c.text)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="hint">
-              接头段长度不设输入，全部由圆角相切关系定位（kernel:17-19）；R_nf 与封头外曲线的切点为数值求根，
-              无闭式解。螺纹/密封面几何插件未建，需要时另行补充。
+              接头段长度不设输入，全部由圆角相切关系定位；颈圆角与封头外曲线的切点用数值求根，没有闭式解。
+              螺纹与密封面几何不在本软件范围内。
             </div>
           </div>
         </div>
