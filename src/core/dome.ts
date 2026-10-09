@@ -76,7 +76,7 @@ export function buildDomeGroup(
       : 0
 
   if (!(r0 > 0) || !(bandTotal > 0) || !(mR > 0)) {
-    return { error: `${angleDeg}° 组：极孔半径或带宽非法（r0=${r0.toFixed(3)}, b_tot=${bandTotal}）` }
+    return { error: `${angleDeg}° 组：极孔半径或带宽不合法（r₀=${r0.toFixed(3)}，总带宽=${bandTotal}）` }
   }
 
   const V1 = mR * nR * tp * (rb * rb * Math.acos(clamp1(r0 / rb)) - r0 * Math.sqrt(Math.max(0, rb * rb - r0 * r0)))
@@ -302,7 +302,7 @@ export function buildDomeGroups(
   for (const g of spiral) {
     if (g.layers <= 0) continue
     if (g.angle >= 90) {
-      failed.push({ angle: g.angle, reason: '环向层（90°）无法上封头，不参与封头校核' })
+      failed.push({ angle: g.angle, reason: '环向层（90°）铺不进封头，不参与封头校核' })
       continue
     }
     const built = buildDomeGroup(g.angle, g.layers, R, bandTotal, tc)

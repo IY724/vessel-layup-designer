@@ -280,23 +280,23 @@ export function matchLineType(thetaDeg: number, opts: { maxDeviation?: number } 
     .slice(0, 5)
 }
 
-/** 长径比与经验区间提示（郑强 2~4、朱宁 2~5；λ≤2.5） */
+/** 常用区间提示（只给判据，来源标注见 docs/DESIGN.md） */
 export function geometryChecks(p: VolumeParams): Array<{ level: 'ok' | 'warn'; text: string }> {
   const out: Array<{ level: 'ok' | 'warn'; text: string }> = []
   const L = 2 * (p.R_in + p.l + 2 * (p.R_in / p.lambda))
   const ratio = p.l / (2 * p.R_in)
   out.push({
     level: ratio > 0 && (ratio < 2 || ratio > 5) ? 'warn' : 'ok',
-    text: `筒身长径比 l/D = ${ratio.toFixed(2)}（论文经验区间 2~5：郑强 2~4、朱宁 2~5）；总长≈${L.toFixed(0)} mm`,
+    text: `筒身长径比 l/D = ${ratio.toFixed(2)}，常用 2~5；总长≈${L.toFixed(0)} mm`,
   })
   out.push({
     level: p.lambda > 2.5 ? 'warn' : 'ok',
-    text: `封头轴比 λ = ${p.lambda.toFixed(3)}（标准椭圆 2，郑强取 √2≈1.414 使赤道环向应力>0，GB/T 11640 铝无缝胆 ≤2）`,
+    text: `封头轴比 λ = ${p.lambda.toFixed(3)}，一般 ≤2.5（标准椭圆为 2，取 √2≈1.414 时赤道环向应力为正）`,
   })
   const r0d = p.r0 / (2 * p.R_in)
   out.push({
     level: r0d > 0.2 || r0d < 0.05 ? 'warn' : 'ok',
-    text: `极孔比 r₀/D = ${r0d.toFixed(3)}（论文案例 0.11~0.13：郑强 16/145、朱宁 36/280）`,
+    text: `极孔比 r₀/D = ${r0d.toFixed(3)}，常用 0.05~0.20`,
   })
   return out
 }

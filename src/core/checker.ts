@@ -151,13 +151,13 @@ export function runCheck(input: DesignInput): CheckResult {
   if (!cylinder.paPass) {
     diagnoses.push({
       level: 'error',
-      text: `筒身纵向爆压不足：pα=${cylinder.pa.toFixed(2)} < pb=${derived.pb.toFixed(2)}，缺口 ${(derived.pb - cylinder.pa).toFixed(2)} MPa`,
+      text: `筒身纵向爆压不足：算得 ${cylinder.pa.toFixed(2)} MPa < 目标 ${derived.pb.toFixed(2)} MPa，缺口 ${(derived.pb - cylinder.pa).toFixed(2)} MPa`,
     })
   }
   if (!cylinder.pthPass) {
     diagnoses.push({
       level: 'error',
-      text: `筒身环向爆压不足：pθ=${cylinder.pth.toFixed(2)} < pb=${derived.pb.toFixed(2)}，缺口 ${(derived.pb - cylinder.pth).toFixed(2)} MPa`,
+      text: `筒身环向爆压不足：算得 ${cylinder.pth.toFixed(2)} MPa < 目标 ${derived.pb.toFixed(2)} MPa，缺口 ${(derived.pb - cylinder.pth).toFixed(2)} MPa`,
     })
   }
   if (!dome.pass) {
@@ -165,15 +165,15 @@ export function runCheck(input: DesignInput): CheckResult {
     diagnoses.push({
       level: 'warn',
       text:
-        `封头存在薄弱区：判定窗口 [${rBoss.toFixed(1)}, R] 内 min ks·Σp=${dome.minP.toFixed(1)} MPa` +
-        ` @ r=${dome.minPR.toFixed(1)} < pb=${derived.pb.toFixed(1)}` +
-        (wz ? `（低载区 r≈${wz.from.toFixed(1)}~${wz.to.toFixed(1)}）` : ''),
+        `封头存在薄弱处：判定范围 r ∈ [${rBoss.toFixed(1)}, ${R.toFixed(1)}] mm 内最低爆压 ${dome.minP.toFixed(1)} MPa` +
+        ` @ r=${dome.minPR.toFixed(1)}，低于目标 ${derived.pb.toFixed(1)} MPa` +
+        (wz ? `（低载区 r≈${wz.from.toFixed(1)}~${wz.to.toFixed(1)} mm）` : ''),
     })
   }
   if (!consistency.ok) {
     diagnoses.push({
       level: 'warn',
-      text: `一致性检查：封头赤道处 t总(R)=${domeSpiralAtR.toFixed(3)} mm 与筒身螺旋层厚 ${cylinderSpiral.toFixed(3)} mm 偏差 ${diff >= 0 ? '+' : ''}${diff.toFixed(3)} mm（>8%），铺层在封头/筒身衔接处可能不连续`,
+      text: `封头与筒身衔接检查：封头赤道处总厚 ${domeSpiralAtR.toFixed(3)} mm 与筒身螺旋层厚 ${cylinderSpiral.toFixed(3)} mm 偏差 ${diff >= 0 ? '+' : ''}${diff.toFixed(3)} mm（>8%），铺层在封头/筒身衔接处可能不连续`,
     })
   }
   for (const f of dome.failedGroups) {
@@ -183,14 +183,14 @@ export function runCheck(input: DesignInput): CheckResult {
   if (input.refMode === 'excel') {
     diagnoses.push({
       level: 'warn',
-      text: '当前为「Excel 原样复算」口径：封头爆压使用原表 L 列笔误式 cos(u·cos u)，中段虚高（最大 +86 MPa），仅用于对账，不可作为设计依据',
+      text: '当前用的是参考表原算法：封头公式少一个右括号（cos(u·cos u)），中段爆压会系统性虚高（最大 +86 MPa），只能用于逐格对账，不能作为设计依据',
     })
   }
   if (dome.minPAll < dome.minP && dome.minPAll < derived.pb) {
     diagnoses.push({
       level: 'ok',
-      text: `极孔侧参考值：r ∈ [${dome.rFirst.toFixed(1)}, ${rBoss.toFixed(1)}) 仅部分角度组覆盖、局部角趋于 90°，` +
-        `按 cos²α 判据该区段最小值 ${dome.minPAll.toFixed(1)} MPa 趋于 0，属判据奇异区而非可设计薄弱截面，故不计入判定`,
+      text: `极孔侧参考值：r ∈ [${dome.rFirst.toFixed(1)}, ${rBoss.toFixed(1)}) 只有一部分角度组铺得到，` +
+        `局部缠绕角趋于 90°，按 cos²α 计算必然趋于 0，属算法在此处失效而非真实薄弱截面，故不计入判定`,
     })
   }
 
@@ -259,10 +259,9 @@ function buildAdvice(input: DesignInput, dome: DomeResult, rBoss: number): Advic
     return {
       kind: 'pole-gap',
       text:
-        `薄弱点在 r≈${dome.minPR.toFixed(1)}，低于全铺层覆盖起点 r=${dome.rFull.toFixed(1)}：` +
-        '该区段只有部分角度组铺到、且各组局部缠绕角趋于 90°，纵向承载按 cos²α 趋于零，' +
-        '属判据奇异区。把判定窗口下界 r_boss 取到全铺层覆盖起点（auto 即此值，当前 ' +
-        `${rBoss.toFixed(1)}）后，薄弱点会落到可设计的截面区间。`,
+        `薄弱点在 r≈${dome.minPR.toFixed(1)}，比"所有角度都铺到"的最小平行圆 r≈${dome.rFull.toFixed(1)} 更靠近极孔：` +
+        '该区段只有一部分角度组铺得到，且各组局部缠绕角趋于 90°，纵向承载按 cos²α 趋于零，属算法在此处的失效。' +
+        `把判定范围下界改为自动取值（当前 ${rBoss.toFixed(1)} mm）后，薄弱点会落到可设计的截面区间。`,
       variants: [],
     }
   }
@@ -274,11 +273,11 @@ function buildAdvice(input: DesignInput, dome: DomeResult, rBoss: number): Advic
   return {
     kind: 'equator',
     text:
-      `薄弱点在 r≈${dome.minPR.toFixed(1)}（近赤道侧）：环向层上不了封头，` +
+      `薄弱点在 r≈${dome.minPR.toFixed(1)}（靠赤道一侧）：环向层铺不进封头，` +
       (best
-        ? `建议 环向 −${best.transfer} 层 ⇄ ${Math.max(...input.constraint.candidates)}° 螺旋 +${best.transfer} 层（等厚度），` +
-          `预计 min ${dome.minP.toFixed(1)} → ${best.minP.toFixed(1)} MPa，r=R 处 ${(last?.pTotal ?? 0).toFixed(1)} → ${best.pAtR.toFixed(1)} MPa`
-        : '无可置换的环向层，需增加高角螺旋层'),
+        ? `建议把 ${best.transfer} 层环向换成 ${Math.max(...input.constraint.candidates)}° 螺旋层（厚度不变），` +
+          `预计封头最低值 ${dome.minP.toFixed(1)} → ${best.minP.toFixed(1)} MPa，赤道处 ${(last?.pTotal ?? 0).toFixed(1)} → ${best.pAtR.toFixed(1)} MPa`
+        : '没有可置换的环向层，需直接增加高角度螺旋层'),
     variants,
   }
 }

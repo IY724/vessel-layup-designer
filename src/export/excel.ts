@@ -306,15 +306,15 @@ function summarySheet(input: DesignInput, res: CheckResult): WS {
   }
   line('复合材料气瓶缠绕铺层设计系统 — 设计方案汇总', '')
   line('导出时间', new Date().toLocaleString('zh-CN'))
-  line('计算口径', input.refMode === 'corrected' ? '修正版 cos²α' : 'Excel 原样复算 cos(u·cos u)')
+  line('封头算法', input.refMode === 'corrected' ? '正确算法 cos²α' : '参考表原算法 cos(u·cos u)（仅对账）')
   line('')
   line('【设计条件】')
   line('筒身段半径 R (mm)', input.geometry.R)
   line('缠绕极孔半径 r₀ (mm)', d.r0)
   line('设计爆破压强 pb (MPa)', d.pb)
   line('应力平衡系数 ks', input.requirement.ks)
-  line('判定窗口 r ∈ [r_boss, R] (mm)', `${effectiveRBoss(input).toFixed(2)} ~ ${input.geometry.R}`)
-  line('  r_boss 取法', input.constraint.rBossAuto ? 'auto = 全铺层覆盖起点 max(r0g)' : '手动指定')
+  line('封头判定范围 r (mm)', `${effectiveRBoss(input).toFixed(2)} ~ ${input.geometry.R}`)
+  line('  判定范围下界取法', input.constraint.rBossAuto ? '自动 = 所有角度都铺到的最小平行圆' : '手动指定')
   line('')
   line('【材料 / 工艺】')
   line('纤维单层厚 tf (mm)', d.tf)
@@ -355,19 +355,19 @@ function summarySheet(input: DesignInput, res: CheckResult): WS {
 function notesSheet(input: DesignInput): WS {
   const ws: WS = {}
   const notes = [
-    ['本文件与原课程 Excel 的差异', ''],
+    ['本文件与参考表的差异', ''],
     ['1', '封头 L 列（局部爆破压强）：原表公式 COS(K*PI()/180*COS(K*PI()/180)) 少一个右括号，应为 cos²K。'],
-    ['', `当前导出文件使用：${input.refMode === 'corrected' ? '修正版 cos²K' : 'Excel 原样 cos(u·cos u)（仅用于对账）'}`],
-    ['', '原表笔误使封头中段爆压系统性虚高（课程案例最大 +86 MPa @ r≈81）。'],
+    ['', `当前导出文件使用：${input.refMode === 'corrected' ? '正确算法 cos²K' : '参考表原算法 cos(u·cos u)（仅用于对账）'}`],
+    ['', '原表笔误使封头中段爆压系统性虚高（默认参数下最大 +86 MPa @ r≈81）。'],
     ['2', '封头 H 列（厚度）：原表由作者手工在 r≤r2b 用样条、r>r2b 用覆盖公式；本文件写成 IF(E<=r2b, 样条, 覆盖) 公式。'],
     ['3', 'r<r0 区段：原表靠手工留空/置 0（样条外插会出负值）；本文件用 IF 守卫，不再产生 #NUM!。'],
     ['4', 'm1..m4：原表 G17 为矩阵求逆数组公式；本文件写数值，并在 B16:H21 给出四条件方程组系数与右端项供复核。'],
     ['5', '层数初估取整：原表手工写"14层/24层"（一个舍一个入）；本文件统一 ROUNDUP 向上取整。'],
     ['6', 'π：原表多处用 3.1415926 硬编码，本文件用 PI()，相对差 8.4e-8。'],
     ['7', '发挥强度：模式 A 自算 2390/0.6×0.85=3385.83；原表 C11 取整为 3385，差 0.025%。'],
-    ['8', '判定窗口：封头最小爆压只在 [r_boss, R] 内取，r_boss 默认 = 全铺层覆盖起点 max(r0g)，只用铺层自身的量。'],
-    ['', '窗口以下的极孔区段只有部分角度组铺到、局部角趋于 90°，cos²α 判据在该处趋于 0，属判据奇异区，只列示不判定。'],
-    ['9', '环向层（90°）不参与封头校核：环向纤维上不了封头。'],
+    ['8', '判定范围：封头最低爆压只在 [判定下界, R] 内取，下界默认 = 所有角度都铺到的最小平行圆，只用铺层自身的量。'],
+    ['', '下界以下的极孔区段只有一部分角度组铺到、局部缠绕角趋于 90°，cos²α 在该处趋于 0，属算法失效区，只列示不判定。'],
+    ['9', '环向层（90°）不参与封头校核：环向纤维铺不进封头。'],
     ['10', '本文件所有结果单元格均为活公式，改参数区（A1:D15）会自动重算。'],
   ]
   notes.forEach(([a, b], i) => {

@@ -66,8 +66,8 @@ export function checkPoleConsistency(
     level === 'ok'
       ? `极孔一致性：r₀=${r0Input.toFixed(2)} ≈ R·sin${alphaMinDeg}°=${r0Geodesic.toFixed(2)}` +
         `（偏差 ${dev >= 0 ? '+' : ''}${dev.toFixed(2)} mm / ${dAlpha >= 0 ? '+' : ''}${dAlpha.toFixed(2)}°，在容差内）`
-      : `极孔一致性偏差 ${dev >= 0 ? '+' : ''}${dev.toFixed(2)} mm（对应角度 ${Number.isNaN(implied) ? '—' : implied.toFixed(2) + '°'}，` +
-        `与最低角度组 ${alphaMinDeg}° 差 ${dAlpha >= 0 ? '+' : ''}${dAlpha.toFixed(2)}°）超出容差，` +
-        '请核对口径：缠绕极孔值 or 瓶口内半径+极孔处内衬厚'
+      : `极孔半径与铺层角度不吻合，偏差 ${dev >= 0 ? '+' : ''}${dev.toFixed(2)} mm（由 r₀ 反算的角度 ${Number.isNaN(implied) ? '—' : implied.toFixed(2) + '°'}，` +
+        `与最低角度组 ${alphaMinDeg}° 差 ${dAlpha >= 0 ? '+' : ''}${dAlpha.toFixed(2)}°）已超出容差，` +
+        '请确认这里填的是缠绕极孔半径，还是瓶口内半径 + 极孔处内衬厚'
   return { r0Geodesic, dev, implied, dAlpha, level, text }
 }
