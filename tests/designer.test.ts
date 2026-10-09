@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import { autoDesign, pickAlternate } from '../src/core/designer'
 import { runCheck } from '../src/core/checker'
-import { courseCase, blankInput } from '../src/core/presets'
+import { defaultInput, blankInput } from '../src/core/presets'
 import { cylinderCheck } from '../src/core/netting'
 import { deriveParams } from '../src/core/materials'
 import type { DesignInput } from '../src/core/types'
@@ -61,7 +61,7 @@ describe('自动生成', () => {
     const out = autoDesign({ ...base, plan: { spiral: [], hoop: 0 } })
     if (!out.ok) throw new Error(out.reason)
     const auto = runCheck(withPlan(base, out.plan)).cylinder.totalThickness
-    const course = runCheck(courseCase()).cylinder.totalThickness
+    const course = runCheck(defaultInput()).cylinder.totalThickness
     expect(auto).toBeLessThan(course)
   })
 

@@ -9,9 +9,9 @@ import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
 import { buildWorkbook } from '../src/export/excel'
 import { runCheck } from '../src/core/checker'
-import { courseCase } from '../src/core/presets'
+import { defaultInput } from '../src/core/presets'
 
-const input = courseCase()
+const input = defaultInput()
 const res = runCheck(input)
 const wb = buildWorkbook(input, res)
 const g10 = res.dome.groups.find((g) => g.angle === 10)!
@@ -141,16 +141,16 @@ describe('跨表汇总：行偏移必须对齐（最易错处）', () => {
 })
 
 describe('汇总与说明页', () => {
-  it('汇总页写入了判定窗口口径（导出报告可追溯）', () => {
+  it('汇总页写入了判定范围与所用算法（导出报告可追溯）', () => {
     const s = wb.Sheets['方案汇总']
     const cells = Object.keys(s)
       .filter((k) => k.startsWith('B'))
       .map((k) => String(s[k].v ?? ''))
-    expect(cells.some((c) => c.includes('全铺层覆盖起点 max(r0g)'))).toBe(true)
-    expect(cells.some((c) => c.includes('修正版 cos²α'))).toBe(true)
+    expect(cells.some((c) => c.includes('所有角度都铺到的最小平行圆'))).toBe(true)
+    expect(cells.some((c) => c.includes('正确算法 cos²α'))).toBe(true)
     expect(cells.some((c) => c.includes('待调整') || c.includes('满足'))).toBe(true)
   })
-  it('说明页列出了与原表的差异', () => {
+  it('说明页列出了与参考表的差异', () => {
     const n = wb.Sheets['说明']
     const txt = Object.keys(n)
       .filter((k) => k.startsWith('B'))

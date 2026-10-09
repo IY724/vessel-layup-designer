@@ -7,7 +7,7 @@
  * 复现工具：仓库外 _work/compare_model.py（逐点 144 格点对账）
  */
 import { describe, expect, it } from 'vitest'
-import { courseCase, blankInput } from '../src/core/presets'
+import { defaultInput, blankInput } from '../src/core/presets'
 import { deriveParams, fiberLayerThickness, compositeLayerThickness, totalBandWidth } from '../src/core/materials'
 import { cylinderCheck, initialEstimate, paUnit, pthUnit, hoopUnit } from '../src/core/netting'
 import { buildDomeGroup, buildDomeGroups, domeAt, domeCheck, groupPressure, groupThickness, isDomeGroup, layerThickness, splineAt, coverageAt } from '../src/core/dome'
@@ -93,7 +93,7 @@ describe('工艺参数链（§9）', () => {
     expect(d.sigmaComposite).toBeCloseTo(2031.5, 3)
   })
   it('模式 B（课程案例）：直接用 Excel 的 3385 / 2031', () => {
-    const d = deriveParams(courseCase())
+    const d = deriveParams(defaultInput())
     expect(d.sigmaSpiral).toBe(3385)
     expect(d.sigmaHoop).toBe(3385)
     expect(d.sigmaComposite).toBe(2031)
@@ -102,7 +102,7 @@ describe('工艺参数链（§9）', () => {
 })
 
 describe('筒身网格理论校核（复刻强度设计与计算.xls）', () => {
-  const d = deriveParams(courseCase())
+  const d = deriveParams(defaultInput())
   const res = cylinderCheck(PLAN, {
     R, tf: d.tf, tc: d.tc, sigmaSpiral: d.sigmaSpiral, sigmaHoop: d.sigmaHoop, pb: d.pb, alphaRef: 20,
   })
@@ -256,7 +256,7 @@ describe('缠绕顺序由用户决定（数组顺序=缠绕先后，核心不重
     const last = [{ angle: 45, layers: 2 }, { angle: 37, layers: 2 }, { angle: 12, layers: 2 }]
     const built = buildDomeGroups(last, R, BAND, TC)
     expect(built.groups.map((g) => g.angle)).toEqual([45, 37, 12])
-    const d = deriveParams(courseCase())
+    const d = deriveParams(defaultInput())
     const cy = cylinderCheck({ spiral: last, hoop: 3 }, {
       R, tf: d.tf, tc: d.tc, sigmaSpiral: d.sigmaSpiral, sigmaHoop: d.sigmaHoop, pb: d.pb, alphaRef: 20,
     })
@@ -289,7 +289,7 @@ describe('测地线角度 ↔ 极孔（§8.3 对照表）', () => {
 })
 
 describe('汇总判定、薄弱区定位与对策（runCheck）', () => {
-  const base = courseCase()
+  const base = defaultInput()
   const input = { ...base, constraint: { ...base.constraint, rBossAuto: false, rBoss: 50.13 } }
   const res = runCheck(input)
 
@@ -343,7 +343,7 @@ describe('汇总判定、薄弱区定位与对策（runCheck）', () => {
 
 describe('调整建议（环向层 ⇄ 高角螺旋层等厚置换）', () => {
   it('近赤道薄弱时，置换 2 层可提高 r=R 处与有效区最小爆压', () => {
-    const base = courseCase()
+    const base = defaultInput()
     const input = { ...base, constraint: { ...base.constraint, rBossAuto: false, rBoss: 125 } }
     const res = runCheck(input)
     const swaps = suggestHoopSwap(input, { maxTransfer: 4, targetAngle: 45 })
