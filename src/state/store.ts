@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DesignInput, GeometryInput, LayupPlan } from '../core/types'
 import { runCheck } from '../core/checker'
-import { PRESETS, courseCase } from '../core/presets'
+import { defaultInput } from '../core/presets'
 
 const KEY = 'vessel-layup-designer.input.v1'
 
@@ -17,14 +17,13 @@ function load(): DesignInput {
       if (parsed?.geometry && parsed?.plan && parsed?.constraint) return parsed
     }
   } catch {
-    /* 隐私模式/无 localStorage：忽略，用预设 */
+    /* 隐私模式/无 localStorage：忽略，用默认模板 */
   }
-  return courseCase()
+  return defaultInput()
 }
 
 export function useDesign() {
   const [input, setInput] = useState<DesignInput>(load)
-  const [presetId, setPresetId] = useState<string>('course140')
 
   useEffect(() => {
     try {
@@ -41,17 +40,12 @@ export function useDesign() {
   )
   const setGeometry = useCallback((v: Partial<GeometryInput>) => patch('geometry', v), [patch])
   const setPlan = useCallback((plan: LayupPlan) => setInput((s) => ({ ...s, plan })), [])
-  const setPreset = useCallback((id: string) => {
-    const p = PRESETS.find((x) => x.id === id)
-    if (!p) return
-    setPresetId(id)
-    setInput(p.make())
-  }, [])
-  const reset = useCallback(() => setInput(PRESETS.find((p) => p.id === presetId)?.make() ?? courseCase()), [presetId])
+  /** 恢复默认模板 */
+  const reset = useCallback(() => setInput(defaultInput()), [])
 
   const result = useMemo(() => runCheck(input), [input])
 
-  return { input, setInput, patch, setGeometry, setPlan, setPreset, presetId, reset, result }
+  return { input, setInput, patch, setGeometry, setPlan, reset, result }
 }
 
 export type DesignStore = ReturnType<typeof useDesign>

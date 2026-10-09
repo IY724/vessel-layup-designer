@@ -1,11 +1,11 @@
 /** fields.tsx — 无第三方依赖的表单原语（经验值一律"内置默认 + 允许自填"） */
 import type { ReactNode } from 'react'
 
-export function Section(props: { n: number | string; title: string; tail?: ReactNode; children: ReactNode }) {
+export function Section(props: { title: ReactNode; tail?: ReactNode; children: ReactNode }) {
   return (
     <div className="card">
       <h3>
-        {props.n}. {props.title}
+        {props.title}
         {props.tail && <span className="tail">{props.tail}</span>}
       </h3>
       {props.children}
@@ -14,20 +14,23 @@ export function Section(props: { n: number | string; title: string; tail?: React
 }
 
 export function Num(props: {
-  label: string
+  label: ReactNode
   value: number | null
   onChange: (v: number | null) => void
-  unit?: string
+  unit?: ReactNode
   step?: number
   hint?: ReactNode
   disabled?: boolean
+  /** 未填/不合法时标红（自动生成弹窗用） */
+  invalid?: boolean
 }) {
-  const { label, value, onChange, unit, step = 1, hint, disabled } = props
+  const { label, value, onChange, unit, step = 1, hint, disabled, invalid } = props
   return (
     <>
       <div className="field">
         <span className="lbl">{label}</span>
         <input
+          className={invalid ? 'missing' : undefined}
           type="number"
           step={step}
           value={value === null ? '' : value}
@@ -45,9 +48,9 @@ export function Num(props: {
 }
 
 export function Radio<T extends string>(props: {
-  label?: string
+  label?: ReactNode
   value: T
-  options: Array<{ value: T; text: string }>
+  options: Array<{ value: T; text: ReactNode }>
   onChange: (v: T) => void
 }) {
   return (
@@ -67,7 +70,23 @@ export function Radio<T extends string>(props: {
   )
 }
 
-export function Check(props: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Pick(props: { label: ReactNode; value: string; options: Array<{ value: string; text: string }>; onChange: (v: string) => void; unit?: ReactNode }) {
+  return (
+    <div className="field">
+      <span className="lbl">{props.label}</span>
+      <select value={props.value} onChange={(e) => props.onChange(e.target.value)}>
+        {props.options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.text}
+          </option>
+        ))}
+      </select>
+      <span className="unit">{props.unit ?? ''}</span>
+    </div>
+  )
+}
+
+export function Check(props: { label: ReactNode; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <div className="radios" style={{ marginBottom: 7 }}>
       <label>
@@ -97,7 +116,9 @@ export function Chips(props: { items: number[]; onChange: (items: number[]) => v
         </span>
       ))}
       <span className="chip" style={{ background: '#fff', borderStyle: 'dashed' }}>
-        <button onClick={add} title="新增候选角">+</button>
+        <button onClick={add} title="新增候选角">
+          +
+        </button>
       </span>
     </div>
   )

@@ -1,10 +1,10 @@
-/** CylinderPanel.tsx — 筒身铺层表（核心交互件，规划 §6.2）：行数不限、可滚动、改动即时刷新 */
+/** CylinderPanel.tsx — 筒身铺层表：行数不限、可滚动、改动即时刷新 */
 import type { DesignStore } from '../state/store'
 import { CYL_COLOR } from './colors'
 
 const n = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—')
 
-export function CylinderPanel({ store }: { store: DesignStore }) {
+export function CylinderPanel({ store, onAuto }: { store: DesignStore; onAuto: () => void }) {
   const { input, setPlan, result } = store
   const cy = result.cylinder
   const pb = result.derived.pb
@@ -47,18 +47,18 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
     <div className="card">
       <h3>
         筒身铺层方案
-        <span className="tail">网格理论 · 行序即缠绕先后 · 改层数即时重算</span>
+        <span className="tail">行序即缠绕先后 · 改层数即时重算</span>
       </h3>
       <div className="tablewrap">
         <table className="grid">
           <thead>
             <tr>
               <th>缠绕先后</th>
-              <th>角度</th>
+              <th>缠绕角</th>
               <th>类型</th>
-              <th>层数（步进可调）</th>
-              <th>pα 贡献 /MPa</th>
-              <th>pθ 贡献 /MPa</th>
+              <th>层数</th>
+              <th>纵向贡献 /MPa</th>
+              <th>环向贡献 /MPa</th>
               <th>厚度 /mm</th>
               <th />
             </tr>
@@ -95,7 +95,7 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
                       />
                       <button onClick={() => setLayers(g.angle, g.layers + 1)}>＋</button>
                     </span>
-                    {odd && <span className="tag" style={{ color: '#8a5a00' }}> 非偶数</span>}
+                    {odd && <span className="tag" style={{ color: '#92400e' }}> 奇数层</span>}
                   </td>
                   <td>{n(r?.paSum ?? 0)}</td>
                   <td>{n(r?.pthSum ?? 0)}</td>
@@ -127,10 +127,10 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
               <td className="tag">0.00</td>
               <td className={cy.pthPass ? 'ok' : 'bad'}>{n(cy.rows.find((r) => r.type === 'hoop')?.pthSum ?? 0)}</td>
               <td>{n(cy.hoopThickness)}</td>
-              <td className="tag">上不了封头</td>
+              <td className="tag">不进入封头</td>
             </tr>
             <tr className="sub">
-              <td colSpan={3}>分组小计</td>
+              <td colSpan={3}>小计</td>
               <td>
                 螺旋 {cy.spiralLayers} 层 / 环向 {cy.hoopLayers} 层
               </td>
@@ -152,26 +152,29 @@ export function CylinderPanel({ store }: { store: DesignStore }) {
           </tbody>
         </table>
       </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
+      <div className="pane-actions">
         <button className="btn sm" onClick={addGroup}>
           + 添加角度组
         </button>
+        <button className="btn sm" onClick={onAuto}>
+          自动生成
+        </button>
         <span className="tag">
-          设计爆压 pb = {n(pb, 1)} MPa；单层厚 tc = {n(result.derived.tc, 4)} mm；σ发挥 螺旋 {n(result.derived.sigmaSpiral, 0)} / 环向{' '}
+          目标爆压 {n(pb, 1)} MPa；单层厚 {n(result.derived.tc, 4)} mm；纤维发挥强度 螺旋 {n(result.derived.sigmaSpiral, 0)} / 环向{' '}
           {n(result.derived.sigmaHoop, 0)} MPa
         </span>
       </div>
       {result.advice.kind !== 'none' && (
         <div className={`banner ${result.verdict === 'fail' ? 'err' : ''}`} style={{ marginTop: 10 }}>
           <div>
-            <b>薄弱环诊断：</b>
+            <b>薄弱处诊断：</b>
             {result.advice.text}
             {result.advice.variants.length > 0 && (
               <div style={{ marginTop: 4 }}>
                 试算：
                 {result.advice.variants.map((v) => (
                   <span key={v.transfer} className="tag" style={{ marginRight: 10 }}>
-                    置换 {v.transfer} 层 → min {v.minP.toFixed(1)}（r≈{v.minPR.toFixed(0)}）、r=R {v.pAtR.toFixed(1)}、pθ {v.pth.toFixed(1)}
+                    置换 {v.transfer} 层 → 封头最低 {v.minP.toFixed(1)}（r≈{v.minPR.toFixed(0)}）、赤道处 {v.pAtR.toFixed(1)}、筒身环向 {v.pth.toFixed(1)} MPa
                   </span>
                 ))}
               </div>

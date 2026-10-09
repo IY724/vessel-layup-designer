@@ -1,5 +1,5 @@
-/** App.tsx — 铺层设计工作台（第一期 V0.1：筒身设计 + 封头校核 + 可视化 + 方案导出） */
-import { useState } from 'react'
+/** App.tsx — 铺层设计工作台：左侧参数输入，右侧结果（筒身铺层 / 封头校核 / 几何） */
+import { useEffect, useState } from 'react'
 import { useDesign } from './state/store'
 import { InputPanel } from './ui/InputPanel'
 import { Overview } from './ui/Overview'
@@ -7,12 +7,14 @@ import { CylinderPanel } from './ui/CylinderPanel'
 import { DomeContour, DomePanel, PressureChart } from './ui/DomePanel'
 import { DetailView } from './ui/DetailView'
 import { GeometryPanel } from './ui/GeometryPanel'
+import { AutoDesignModal } from './ui/AutoDesignModal'
 import { Modal } from './ui/Modal'
-import { PRESETS } from './core/presets'
-import { autoDesign } from './core/designer'
 import { exportWorkbook } from './export/excel'
-import { MP70_STRENGTH_B, COURSE_STRENGTH_B } from './core/presets'
+import { DEFAULT_PRESET } from './core/presets'
 import type { RefMode } from './core/types'
+
+/** 封头强度算法的两种取法：corrected = 正确算法（默认）；excel = 复算参考表原写法，只用于逐格对账 */
+const ALGO_TEXT: Record<RefMode, string> = { corrected: '正确算法', excel: '参考表原算法（仅对账）' }
 
 function download(name: string, text: string, mime = 'application/json') {
   const url = URL.createObjectURL(new Blob([text], { type: mime }))
@@ -25,11 +27,16 @@ function download(name: string, text: string, mime = 'application/json') {
 
 export default function App() {
   const store = useDesign()
-  const { input, result, setInput, setPreset, presetId, reset } = store
+  const { input, result, setInput, reset } = store
   const [expand, setExpand] = useState<'contour' | 'curve' | 'detail' | null>(null)
-  const [autoMsg, setAutoMsg] = useState<string>('')
+  const [auto, setAuto] = useState(false)
+  const [msg, setMsg] = useState('')
 
-  const [mode, setMode] = useState<'auto' | 'manual'>('manual')
+  useEffect(() => {
+    if (!msg) return
+    const t = setTimeout(() => setMsg(''), 8000)
+    return () => clearTimeout(t)
+  }, [msg])
 
   const importJson = () => {
     const el = document.createElement('input')
@@ -45,9 +52,9 @@ export default function App() {
           const inp = obj.input ?? obj
           if (!inp?.geometry || !inp?.plan || !inp?.constraint) throw new Error('缺少 geometry/plan/constraint')
           setInput(inp)
-          setAutoMsg(`已载入方案：R=${inp.geometry.R} mm、pb=${inp.requirement?.pb ?? inp.requirement?.workingPressure} MPa、${inp.plan.spiral.length} 个螺旋角组`)
+          setMsg(`已载入方案：R=${inp.geometry.R} mm、爆压要求 ${inp.requirement?.pb ?? inp.requirement?.workingPressure} MPa、${inp.plan.spiral.length} 个螺旋角组`)
         } catch (e) {
-          setAutoMsg(`导入失败：${(e as Error).message}。需要本软件导出的方案 JSON（含 input.geometry / plan / constraint）`)
+          setMsg(`导入失败：${(e as Error).message}。需要本软件导出的方案 JSON`)
         }
       }
       rd.readAsText(f)
@@ -57,20 +64,10 @@ export default function App() {
 
   const exportExcel = () => {
     try {
-      setAutoMsg(`已导出 Excel：${exportWorkbook(input, result)}`)
+      setMsg(`已导出计算书：${exportWorkbook(input, result)}`)
     } catch (e) {
-      setAutoMsg(`导出失败：${(e as Error).message}`)
+      setMsg(`导出失败：${(e as Error).message}`)
     }
-  }
-
-  const runAuto = () => {
-    const out = autoDesign(input)
-    if (!out.ok) {
-      setAutoMsg(`自动生成失败：${out.reason}`)
-      return
-    }
-    setAutoMsg(out.trace.join('　·　'))
-    setInput({ ...input, plan: out.plan })
   }
 
   const exportJson = () =>
@@ -78,7 +75,7 @@ export default function App() {
       `铺层方案-R${input.geometry.R}-pb${result.derived.pb.toFixed(0)}.json`,
       JSON.stringify(
         {
-          meta: { tool: 'vessel-layup-designer', version: '0.1.0', caliber: input.refMode, date: new Date().toISOString() },
+          meta: { tool: 'vessel-layup-designer', version: '1.1.0', algorithm: input.refMode, date: new Date().toISOString() },
           input,
           summary: {
             pa: result.cylinder.pa,
@@ -103,103 +100,72 @@ export default function App() {
     <div className="app">
       <div className="topbar">
         <div className="brand">
-          <b>复合材料气瓶缠绕铺层设计</b>
-          <span>V1.0 · 网格理论筒身 / 封头缠绕规律校核</span>
+          <span className="mark">铺</span>
+          <span className="bt">
+            <b>复合材料气瓶缠绕铺层设计</b>
+            <span>筒身网格理论 · 封头缠绕规律校核 · V1.1</span>
+          </span>
         </div>
-        <label className="cap">预设模板</label>
-        <select value={presetId} onChange={(e) => setPreset(e.target.value)}>
-          {PRESETS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        <div className="seg">
-          <button
-            className={mode === 'auto' ? 'on' : ''}
-            onClick={() => {
-              setMode('auto')
-              runAuto()
-            }}
-            title="按候选角集与约束自动生成铺层方案"
-          >
-            自动生成
+
+        <div className="tgroup">
+          <button className="btn primary" onClick={() => setAuto(true)} title="给齐目标与工艺参数，自动算出铺层并填入">
+            自动生成铺层
           </button>
-          <button
-            className={mode === 'manual' ? 'on' : ''}
-            onClick={() => {
-              setMode('manual')
-              setAutoMsg('')
-            }}
-            title="直接在铺层表里改层数/角度，即时重算"
-          >
-            手动调整
+          <button className="btn" onClick={reset} title={`恢复默认参数（${DEFAULT_PRESET.label}）`}>
+            恢复默认
           </button>
         </div>
-        <button className="btn" onClick={reset}>
-          重置
-        </button>
-        <label className="cap">口径</label>
-        <select value={input.refMode} onChange={(e) => setInput({ ...input, refMode: e.target.value as RefMode })}>
-          <option value="corrected">修正版 cos²α</option>
-          <option value="excel">Excel 原样复算</option>
-        </select>
-        <button className="btn" onClick={importJson} title="读回之前导出的方案 JSON">
-          导入 JSON
-        </button>
-        <button className="btn" onClick={exportJson}>
-          导出方案 JSON
-        </button>
-        <button className="btn primary" onClick={exportExcel} title="复刻两张 Excel + 方案汇总 + 口径说明，单元格为活公式">
-          导出 Excel 报告
-        </button>
-        <button className="btn" onClick={() => window.print()} title="打印或另存为 PDF">
-          打印/PDF
-        </button>
-        <label className="cap">强度预设</label>
-        <select
-          value=""
-          onChange={(e) => {
-            if (e.target.value === 'mp70') setInput({ ...input, strength: { ...MP70_STRENGTH_B } })
-            else if (e.target.value === 'course') setInput({ ...input, strength: { ...COURSE_STRENGTH_B } })
-          }}
-        >
-          <option value="" disabled>
-            载入…
-          </option>
-          <option value="course">课程案例 3385 / 3385 · σc 2031</option>
-          <option value="mp70">70MPa 案例 螺旋3859/环向4342</option>
-        </select>
-        <button className="btn" onClick={() => setExpand('detail')}>
-          校核明细（对表 Excel）
-        </button>
+
+        <div className="tgroup">
+          <label className="cap">封头算法</label>
+          <select value={input.refMode} onChange={(e) => setInput({ ...input, refMode: e.target.value as RefMode })}>
+            <option value="corrected">正确算法（推荐）</option>
+            <option value="excel">参考表原算法（仅对账）</option>
+          </select>
+        </div>
+
+        <div className="tgroup">
+          <button className="btn" onClick={importJson} title="读回之前导出的方案 JSON">
+            导入 JSON
+          </button>
+          <button className="btn" onClick={exportJson}>
+            导出 JSON
+          </button>
+          <button className="btn" onClick={exportExcel} title="逐格可追溯的计算书，单元格为活公式">
+            导出 Excel 计算书
+          </button>
+          <button className="btn" onClick={() => window.print()} title="打印或另存为 PDF">
+            打印 / PDF
+          </button>
+        </div>
+
+        <div className="tgroup">
+          <button className="btn" onClick={() => setExpand('detail')}>
+            校核明细
+          </button>
+        </div>
       </div>
 
       <div className="layout">
         <InputPanel store={store} />
         <div className="panel">
           <Overview result={result} input={input} />
-          {autoMsg && (
-            <div className="banner ok">
-              <span>⚡</span>
-              <div>{autoMsg}</div>
-            </div>
-          )}
-          <CylinderPanel store={store} />
+          <CylinderPanel store={store} onAuto={() => setAuto(true)} />
           <DomePanel input={input} result={result} onExpand={(w) => setExpand(w)} />
           <GeometryPanel input={input} result={result} />
         </div>
       </div>
 
       <div className="statusbar">
-        <span>版本 V1.0</span>
-        <span>计算口径：{input.refMode === 'corrected' ? '修正 cos²α' : 'Excel 原样复算'}</span>
-        <span>判定窗口 r_boss：{input.constraint.rBossAuto ? '自动（全铺层覆盖起点）' : '手动'}</span>
-        <span>公式依据：两张课程 Excel + 朱宁2023 / 郑强2008 + type4 插件 kernel</span>
-        <span>数值对账：tests/ 99 项断言（封头 144 格点逐点）</span>
-        <span>本机离线运行，不上传数据</span>
+        <span>V1.1</span>
+        <span>封头算法：{ALGO_TEXT[input.refMode]}</span>
+        <span>判定范围下界：{input.constraint.rBossAuto ? '自动（全部角度铺到处）' : '手动指定'}</span>
+        <span>内置自检 99 项</span>
+        <span>本机离线运行，数据不上传</span>
+        {msg && <span className="msg">{msg}</span>}
       </div>
 
+      {auto && <AutoDesignModal input={input} onApply={(next) => setInput(next)} onClose={() => setAuto(false)} />}
       {expand === 'contour' && (
         <Modal title="封头厚度几何轮廓" onClose={() => setExpand(null)} wide>
           <div style={{ maxWidth: 1150 }}>
@@ -208,12 +174,12 @@ export default function App() {
         </Modal>
       )}
       {expand === 'curve' && (
-        <Modal title="封头爆破压强 p总(r) × ks" onClose={() => setExpand(null)} wide>
+        <Modal title="封头沿母线的爆破压强分布" onClose={() => setExpand(null)} wide>
           <PressureChart input={input} result={result} W={1360} H={620} showExcel />
         </Modal>
       )}
       {expand === 'detail' && (
-        <Modal title="校核明细（逐格对照两张 Excel）" onClose={() => setExpand(null)} wide>
+        <Modal title="校核明细（逐格对照参考表）" onClose={() => setExpand(null)} wide>
           <DetailView input={input} result={result} />
         </Modal>
       )}
