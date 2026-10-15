@@ -11,13 +11,6 @@ export type StrengthMode = 'A' | 'B'
 export type PoleInputMode = 'winding' | 'port'
 /** 设计爆压给法：direct = 直接填 pb；wp_sf = 工作压力 × 安全系数换算 */
 export type PbInputMode = 'direct' | 'wp_sf'
-/**
- * 计算口径：
- *   corrected = 软件修正口径（封头爆压用 cos²α；r < r₀ 的组厚度取 0）——物理正确，默认
- *   excel     = Excel 原样复算（爆压用笔误式 cos(u·cos u)；样条为负才置零，即作者手工留空的真实形态）——用于与原表对账
- */
-export type RefMode = 'corrected' | 'excel'
-
 export interface GeometryInput {
   /** 筒身段中面半径 R（mm）。第一期按 Excel 口径：缠绕层中心面半径 */
   R: number
@@ -80,16 +73,15 @@ export interface RequirementInput {
 }
 
 export interface ConstraintInput {
+  /** 原表 C27/C29 的手工选取层数；与 B27/B29 的小数估算量分开保留。 */
+  manualSpiralEstimate?: number | null
+  manualHoopEstimate?: number | null
   /** 候选螺旋角集（度），可自由增删 */
   candidates: number[]
   /** 角度分配规则：alternate = 课件经验"隔一取一"；manual = 手动指定 */
   angleRule: 'alternate' | 'manual'
   /** 螺旋层必须偶数（±成对，缠绕物理要求） */
   forceEvenSpiral: boolean
-  /** 封头判定窗口下界 r_boss（mm）：r < 此值视为金属接嘴补强区，不计入最小爆压判定 */
-  rBoss: number
-  /** rBoss 是否自动取（最低角度组 r₀ + 1 倍总带宽） */
-  rBossAuto: boolean
   /** 参考角 αref（度）：筒身厚度初估用（复刻 Excel 左列 20°） */
   alphaRef: number
 }
@@ -97,12 +89,16 @@ export interface ConstraintInput {
 /** 一个角度组：螺旋层 angle < 90，环向层 angle = 90 */
 export interface GroupSpec {
   angle: number
+  /** 原表 H 列人工选用样条的最后半径；留空时以 r2b 分段。 */
+  splineEndRadius?: number | null
   /** 层数（螺旋组为 ±成对的总层数，故应为偶数） */
   layers: number
+  /** 是否激活：false = 该组保留在表里但不参与计算（缺省即激活） */
+  active?: boolean
 }
 
 export interface LayupPlan {
-  /** 螺旋角度组，按角度升序 */
+  /** 螺旋角度组；数组顺序 = 缠绕先后，允许同一角度出现多行，可标记 active=false */
   spiral: GroupSpec[]
   /** 环向层数（90°） */
   hoop: number
@@ -114,7 +110,6 @@ export interface DesignInput {
   strength: StrengthInput
   requirement: RequirementInput
   constraint: ConstraintInput
-  refMode: RefMode
   plan: LayupPlan
 }
 
@@ -186,6 +181,8 @@ export interface CylinderResult {
 /** 封头单个角度组的模型参数 */
 export interface DomeGroup {
   angle: number
+  splineEndRadius: number
+  manualSplineEndRadius?: number | null
   /** 该组层数 */
   layers: number
   /** 缠绕循环数 = 层数/2（每组各自取值，不能一律 ×2） */
@@ -256,6 +253,7 @@ export interface SwapVariant {
   minP: number
   minPR: number
   pAtR: number
+  headPressure: number
   pa: number
   pth: number
   totalThickness: number
@@ -272,8 +270,10 @@ export interface CheckResult {
   derived: DerivedParams
   cylinder: CylinderResult
   dome: DomeResult
+  /** 第六课椭圆封头经验初估：ks·Σ(2·σfb·n·tf·cos²α₀/R)，不作局部曲线判定。 */
+  head: { pressure: number; pass: boolean }
   /** 封头→筒身螺旋层连续性：t总(R) 与筒身螺旋层厚之差 */
-  consistency: { domeSpiralAtR: number; cylinderSpiral: number; diff: number; ok: boolean }
+  consistency: { domeSpiralAtR: number; cylinderSpiral: number; diff: number }
   weight: { cylinderKg: number; domeKg: number; totalKg: number; rhoComposite: number }
   verdict: 'pass' | 'adjust' | 'fail'
   diagnoses: Diagnosis[]

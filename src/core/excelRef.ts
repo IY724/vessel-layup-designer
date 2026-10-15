@@ -1,154 +1,39 @@
 /**
- * excelRef.ts — 「Excel 原样复算」口径的公式对照表
+ * excelRef.ts — 公式清单（只讲"算什么"，不出现任何内部对账 / 验证语言）
  *
- * 软件默认 corrected（物理正确口径）；切到 excel 时用于与原表逐格对账。
- * 本文件只做两件事：① 保存两套公式的原文，供"校核明细"面板并列展示；
- * ② 记录已核对出的 Excel 原表问题（笔误/口径不一致），供报告引用。
+ * 每条：label 项目名、formula 公式（LaTeX 子集，界面用 <Tex> 渲染成 MathML）、purpose 一句话作用。
  */
 
 export interface FormulaRow {
   /** 名称（界面显示） */
   label: string
-  /** Excel 原文（含单元格引用，逐字照抄自提取结果） */
-  excel: string
-  /** 软件实现（corrected 口径） */
-  corrected: string
-  /** 差异说明；无差异留空 */
-  note: string
+  /** 公式（LaTeX 子集，界面用 Tex 渲染） */
+  formula: string
+  /** 作用：这个公式算什么 */
+  purpose: string
 }
 
-export const CYLINDER_FORMULAS: FormulaRow[] = [
-  {
-    label: '纤维单层厚 tf',
-    excel: 'C8 = C7/C6/C4  （线密度/密度/带宽）',
-    corrected: 'tf = tex / (ρ_fiber · b)',
-    note: '',
-  },
-  {
-    label: '复材单层厚 tc',
-    excel: 'C9 = C8/C5',
-    corrected: 'tc = tf / Vf',
-    note: '',
-  },
-  {
-    label: '单层纵向爆压贡献',
-    excel: 'I12 = 2*$C$8*$C$11*J3/$C$3',
-    corrected: 'pαi = 2·tf·σ_螺旋·cos²α / R',
-    note: 'Excel 用四舍五入后的 σ发挥=3385；模式 A 自算为 2390/0.6×0.85=3385.83',
-  },
-  {
-    label: '单层环向爆压贡献',
-    excel: 'J12 = $C$11*$C$8*K3/$C$3',
-    corrected: 'pθi = tf·σ_螺旋·sin²α / R',
-    note: '',
-  },
-  {
-    label: '环向层单层环向爆压',
-    excel: 'J22 = C11*C8/C3',
-    corrected: 'pθ90 = tf·σ_环向 / R',
-    note: '',
-  },
-  {
-    label: '螺旋向厚度初估',
-    excel: 'B20 = (C3*C10)/(2*C11*B17*B17)',
-    corrected: 'h螺 = R·pb / (2σ·cos²αref)',
-    note: '',
-  },
-  {
-    label: '环向厚度初估',
-    excel: 'B24 = (2-B18*B18)*C3*C10/(2*C11)',
-    corrected: 'h环 = (2−tan²αref)·R·pb / (2σ)',
-    note: '',
-  },
-]
+export const FORMULAS: FormulaRow[] = [
+  // ── 材料与工艺 ──
+  { label: '纤维单层厚 t_f', formula: 't_f=\\dfrac{tex}{\\rho_{f}\\cdot b}', purpose: '由线密度、纤维密度与带宽换算单层纤维厚度' },
+  { label: '复材单层厚 t_c', formula: 't_c=\\dfrac{t_f}{V_f}', purpose: '单层纤维厚除以体积含量，得含树脂的单层厚度' },
 
-export const DOME_FORMULAS: FormulaRow[] = [
-  {
-    label: '极孔半径',
-    excel: 'I3 = SIN(G3)*$C$3',
-    corrected: 'r0g = R·sinαg',
-    note: '',
-  },
-  {
-    label: '平行圆纤维数',
-    excel: 'L3 = 2*3.1415926*C3/C13*H3',
-    corrected: 'mR = 2πR·cosα / b_tot',
-    note: 'Excel 用 3.1415926 近似 π',
-  },
-  {
-    label: '2 倍带宽外厚度（覆盖公式）',
-    excel: 'G23 = $L$3*$N$3*(ACOS($I$3/E23)-ACOS(($I$3+$C$13)/E23))*$O$3/3.1415926',
-    corrected: 't_cov = mR·nR·tp/π·[arccos(r0/r) − arccos(rb/r)]',
-    note: '',
-  },
-  {
-    label: '纤维体积守恒常数',
-    excel: 'K8 = M9+O9  （V1+V2，闭式）',
-    corrected: 'Vconst = V1 + V2',
-    note: '已数值验证：V1=18367.7913、V2=13896.9294 @10°（本实现 Vconst=32264.7212 vs Excel 32264.7207）',
-  },
-  {
-    label: '2 倍带宽内厚度（三次样条）',
-    excel: 'F23 = $G$17+$G$18*E23+$G$19*E23*E23+$G$20*E23*E23*E23',
-    corrected: 't = m1+m2·r+m3·r²+m4·r³（4 条件线性方程组）',
-    note: 'Excel 的 m1 是数组公式（矩阵求逆 × 右端项），本实现直接解 4×4',
-  },
-  {
-    label: '组厚度',
-    excel: 'J23 = H23*$I$23',
-    corrected: 't_g = cycles · t(r)，cycles = 该组层数/2',
-    note: '★每组各自取值：10/17/25°×4 层→2，37/40/45°×2 层→1，不能一律 ×2',
-  },
-  {
-    label: '局部缠绕角',
-    excel: 'K23 = ASIN($I$3/E23)/3.1415926*180',
-    corrected: 'αg(r) = arcsin(r0g/r)',
-    note: 'r < r0g 时 Excel 出 #NUM!，作者把该行 L 列手工置 0',
-  },
-  {
-    label: '组局部爆破压强',
-    excel: 'L23 = 2*J23*$C$15/$C$3*COS(K23/180*PI()*COS(K23/180*PI()))',
-    corrected: 'p_g = 2·t_g·σc/R·cos²αg(r)',
-    note: '★原表少一个右括号：cos(u·cos u) ≠ cos²u。u→0（赤道）时两者都≈1；u→90°（各组自己的极孔边缘）时 0.995 vs 0.004。逐点对账：原算法与参考表最大差 0.0028 MPa，修正后最大差 86.0 MPa @ r=81',
-  },
-  {
-    label: '总厚度 / 总爆破压强',
-    excel: "总厚度!B2 = '10'!J23+'17'!J23+…+'45'!J23 ；总爆破压强!C2 = B2*0.75",
-    corrected: '总厚 = Σ各组厚；爆压 = ks·Σ各组爆压',
-    note: '参考表把 ks 固定为 0.75（常用 0.7~0.8），本软件开放 0.70~0.80',
-  },
-]
+  // ── 筒身 ──
+  { label: '单层纵向爆压贡献', formula: 'p_{\\alpha i}=\\dfrac{2\\,t_f\\,\\sigma_{\\text{螺旋}}\\cos^2\\alpha}{R}', purpose: '一根螺旋纤维层对筒身纵向爆破压强的贡献' },
+  { label: '单层环向爆压贡献', formula: 'p_{\\theta i}=\\dfrac{t_f\\,\\sigma_{\\text{螺旋}}\\sin^2\\alpha}{R}', purpose: '一根螺旋纤维层对筒身环向爆破压强的贡献' },
+  { label: '环向层单层环向爆压', formula: 'p_{\\theta 90}=\\dfrac{t_f\\,\\sigma_{\\text{环向}}}{R}', purpose: '一根环向（90°）纤维层的环向贡献，纵向为零' },
+  { label: '螺旋向厚度初估', formula: 'h_{\\text{螺}}=\\dfrac{R\\,p_b}{2\\,\\sigma\\cos^2\\alpha_{ref}}', purpose: '按参考角粗估螺旋层所需的总厚度' },
+  { label: '环向厚度初估', formula: 'h_{\\text{环}}=\\dfrac{(2-\\tan^2\\alpha_{ref})\\,R\\,p_b}{2\\,\\sigma}', purpose: '粗估环向层所需的总厚度' },
 
-/** 已核对出的原表问题清单（报告/界面提示引用） */
-export const EXCEL_ISSUES = [
-  {
-    id: 'cos2-typo',
-    severity: '高' as const,
-    where: '封头表各角度 sheet L 列（局部爆破压强）',
-    text:
-      '公式 COS(K*PI()/180*COS(K*PI()/180)) 少一个右括号，应为 cos²K。' +
-      '小角度（赤道侧）两者几乎相等，各组自己的极孔边缘（K→90°）差异巨大，' +
-      '导致封头中段与极孔侧爆压预测系统性虚高（默认参数下最大 +86 MPa）。',
-  },
-  {
-    id: 'negative-spline',
-    severity: '中' as const,
-    where: '封头表 F/H 列（2 倍带宽内厚度）',
-    text:
-      '样条在 r < r0 区间会外插出负值，原表靠作者手工留空/置 0 截断，' +
-      '导致每组 r0 下方 1~2 个格点仍带 0.04~0.45 mm 的虚假厚度。' +
-      '本软件统一为 r < r0 → 该组厚度 0。',
-  },
-  {
-    id: 'pi-approx',
-    severity: '低' as const,
-    where: '封头表 L3 / 筒身表 I3 等多处',
-    text: 'π 用 3.1415926 硬编码近似，与 Math.PI 差 2.7e-8，对结果影响 <0.001%。',
-  },
-  {
-    id: 'sigma-round',
-    severity: '低' as const,
-    where: '筒身表 C11 = 3385',
-    text: '发挥强度取整为 3385 MPa（2390/0.6×0.85 = 3385.83），软件模式 A 用未取整值，差 0.025%。',
-  },
+  // ── 封头 ──
+  { label: '起铺平行圆半径', formula: 'r_{0g}=R\\sin\\alpha_g', purpose: '由缠绕角求该角度组开始铺到的平行圆半径' },
+  { label: '平行圆纤维数', formula: 'm_R=\\dfrac{2\\pi_0 R\\cos\\alpha}{b_{tot}}', purpose: 'π₀ = 3.1415926' },
+  { label: '覆盖区厚度', formula: 't_{cov}=\\dfrac{m_R n_R t_p}{\\pi_0}\\left[\\arccos\\dfrac{r_0}{r}-\\arccos\\dfrac{r_b}{r}\\right]', purpose: '2倍带宽外厚度，π₀ = 3.1415926' },
+  { label: '体积守恒常数', formula: 'V_{const}=V_1+V_2', purpose: '样条段应满足的纤维体积守恒量' },
+  { label: '样条段厚度', formula: 't=m_1+m_2 r+m_3 r^2+m_4 r^3', purpose: '2 倍带宽以内区段的单层厚度（三次样条）' },
+  { label: '组厚度', formula: 't_g=cycles\\cdot t(r)', purpose: '该角度组的厚度＝循环数×单层厚，循环数＝层数 ÷ 2' },
+  { label: '封头缠绕角度', formula: 'K=\\dfrac{180}{\\pi_0}\\arcsin\\dfrac{r_0}{r}', purpose: '角度单位 °，π₀ = 3.1415926' },
+  { label: '组局部参考爆压', formula: 'u=K\\pi/180,\\quad p_g=\\dfrac{2\\,t_g\\,\\sigma_c}{R}\\cos^2 u', purpose: '局部角 K；用于局部参考曲线' },
+  { label: '总厚度 / 局部参考爆压', formula: 't_{\\text{总}}=\\sum t_g\\qquad p_{\\text{总}}=k_s\\sum p_g', purpose: '逐点求和；局部曲线仅作参考' },
+  { label: '封头经验初估', formula: 'P_{b,h}=k_s\\sum_i\\dfrac{2\\sigma_{fb}n_i t_f\\cos^2\\alpha_{0i}}{R}', purpose: '筒身角 α₀、纯纤维厚度与纤维强度' },
 ]

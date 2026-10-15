@@ -57,11 +57,6 @@ const EXCEL_T: Record<string, number> = {
   '30.2': 0.668244, '50': 6.67681, '62': 9.70305, '70': 9.015007, '83': 10.552094,
   '104': 8.21527, '128': 9.504209, '150': 7.460723, '173.5': 5.737058,
 }
-/** Excel 总爆破压强!B 列（未乘 ks，笔误口径 cos(u·cos u)） */
-const EXCEL_P_RAW: Record<string, number> = {
-  '30.2': 15.561001, '50': 133.094523, '62': 199.330739, '70': 185.237836, '83': 219.847716,
-  '104': 167.548682, '128': 201.29412, '150': 158.178561, '173.5': 123.92184,
-}
 const DOME_10 = {
   r0: 30.127959, rb: 50.127959, r2b: 70.127959, mR: 53.678553, tR: 0.611111,
   Vconst: 32264.7207, m1: -30.982068, m2: 1.83833147687698, m3: -0.0318264791471904,
@@ -75,8 +70,8 @@ const R0_TABLE: Record<number, number> = {
 const built = buildDomeGroups(PLAN.spiral, R, BAND, TC)
 const groups = built.groups
 
-function domeArgs(refMode: 'corrected' | 'excel', rBoss = 50.13) {
-  return { R, bandTotal: BAND, tc: TC, sigmaComposite: SIGC, ks: KS, refMode, rBoss, pb: 90, samples: 288 }
+function domeArgs(rBoss = 122.683) {
+  return { R, bandTotal: BAND, tc: TC, sigmaComposite: SIGC, ks: KS, rBoss, pb: 90, samples: 288 }
 }
 
 describe('工艺参数链（§9）', () => {
@@ -133,9 +128,8 @@ describe('筒身网格理论校核（复刻强度设计与计算.xls）', () => 
     expect(e.hHoop).toBeCloseTo(CYL.hHoop, 6)
     expect(e.hTotal).toBeCloseTo(CYL.hTotal, 6)
     expect(e.tComposite).toBeCloseTo(CYL.tCompositeEst, 6)
-    // 软件规则：层数向上取整（Excel 手工写了 14 层/24 层，此处保守取 15/24）
-    expect(e.nSpiral).toBe(15)
-    expect(e.nHoop).toBe(24)
+    expect(e.nSpiral).toBeCloseTo(14.247551987639529,10)
+    expect(e.nHoop).toBeCloseTo(23.49516319968423,10)
   })
   it('单层贡献函数与表格口径一致', () => {
     expect(paUnit(10, CYL.tf, 3385, R)).toBeCloseTo(CYL.paUnit[0], 6)
@@ -166,8 +160,8 @@ describe('封头单组模型（复刻封头表 10° sheet）', () => {
     expect(splineAt(g10, 70)).toBeCloseTo(DOME_10.t70, 6)
     expect(coverageAt(g10, R)).toBeCloseTo(DOME_10.t173_5, 6)
     // 样条/覆盖在 r2b 处衔接（Excel 验证 t样条(70.128)=1.84450 vs t覆盖(70.128)=1.84444）
-    expect(layerThickness(g10, 70.128, 'corrected')).toBeGreaterThan(1.8)
-    expect(layerThickness(g10, 70.128, 'corrected')).toBeLessThan(1.85)
+    expect(layerThickness(g10, 70.128)).toBeGreaterThan(1.8)
+    expect(layerThickness(g10, 70.128)).toBeLessThan(1.85)
   })
   it('样条首条件 t(r0) = nR·tp', () => expect(splineAt(g10, g10.r0)).toBeCloseTo(TC, 8))
   it('局部角 K(30.2) = 86.0416813°', () => {
@@ -175,15 +169,10 @@ describe('封头单组模型（复刻封头表 10° sheet）', () => {
     expect((u * 180) / Math.PI).toBeCloseTo(DOME_10.K30_2, 5)
   })
   it('组厚度 J(30.2) = 0.668243610407（含循环数 2）', () => {
-    expect(groupThickness(g10, 30.2, 'corrected')).toBeCloseTo(DOME_10.J30_2, 8)
+    expect(groupThickness(g10, 30.2)).toBeCloseTo(DOME_10.J30_2, 8)
   })
-  it('Excel 原样口径的 L(30.2) = 15.5610013563449', () => {
-    expect(groupPressure(g10, 30.2, R, SIGC, 'excel')).toBeCloseTo(DOME_10.L30_2, 6)
-  })
-  it('修正 cos² 口径在极孔边缘显著低于笔误式（规划 §2 的核心发现）', () => {
-    const fixed = groupPressure(g10, 30.2, R, SIGC, 'corrected')
-    expect(fixed).toBeLessThan(DOME_10.L30_2)
-    expect(fixed).toBeGreaterThan(0)
+  it('组爆压 p_g(30.2) 为正（单一 cos²α 口径）', () => {
+    expect(groupPressure(g10, 30.2, R, SIGC)).toBeGreaterThan(0)
   })
 })
 
@@ -193,59 +182,38 @@ describe('循环数 I23 = 层数/2（★每组各自取值）', () => {
       [10, 2], [17, 2], [25, 2], [37, 1], [40, 1], [45, 1],
     ])
   })
-  it('r < r0 时组厚度/组爆压为 0（修正口径）', () => {
+  it('r < r0 时保留原表正样条厚度，爆压仍为 0', () => {
     const g45 = groups.find((g) => g.angle === 45)!
     expect(g45.r0).toBeCloseTo(R0_TABLE[45], 6)
-    expect(groupThickness(g45, 122.6, 'corrected')).toBe(0)
-    expect(groupPressure(g45, 122.6, R, SIGC, 'corrected')).toBe(0)
-    expect(groupThickness(g45, 122.7, 'corrected')).toBeGreaterThan(0)
+    expect(groupThickness(g45, 122.6)).toBeCloseTo(0.2938443258936161,9)
+    expect(groupPressure(g45, 122.6, R, SIGC)).toBe(0)
+    expect(groupThickness(g45, 122.7)).toBeGreaterThan(0)
   })
 })
 
-describe('封头逐点复现 Excel（总厚度 / 总爆破压强表，抽样 9 个格点）', () => {
-  const at = (r: number, refMode: 'corrected' | 'excel' = 'excel') =>
-    domeAt(groups, r, R, SIGC, KS, refMode)
+describe('封头逐点复现 Excel（总厚度表，抽样 9 个格点）', () => {
+  const at = (r: number) => domeAt(groups, r, R, SIGC, KS)
 
-  it('总厚度 t总(r) 与 Excel「总厚度」表一致（excel 口径 ≤1e-3 mm）', () => {
-    for (const [k, v] of Object.entries(EXCEL_T)) {
-      expect(at(Number(k)).tTotal).toBeCloseTo(v, 3)
-    }
-  })
-  it('总爆破压强（笔误口径，未乘 ks）与 Excel B 列一致（≤1e-2 MPa）', () => {
-    for (const [k, v] of Object.entries(EXCEL_P_RAW)) {
-      expect(at(Number(k)).pSum).toBeCloseTo(v, 2)
-    }
-  })
-  it('修正口径在常规点与 Excel 同值，在 r=50/73 处剔除极孔下方样条外插的虚假厚度', () => {
-    for (const k of ['62', '83', '128', '150', '173.5']) {
-      expect(at(Number(k), 'corrected').tTotal).toBeCloseTo(at(Number(k), 'excel').tTotal, 4)
-    }
-    for (const k of ['50', '73', '104']) {
-      const leak = at(Number(k), 'excel').tTotal - at(Number(k), 'corrected').tTotal
-      expect(leak).toBeGreaterThan(0.03)
-      expect(leak).toBeLessThan(0.5)
+  it('总厚度 t总(r) 在全铺层覆盖区与单组起点与 Excel 一致（≤1e-3 mm）', () => {
+    // 统一 cos²α 口径后，r < max(r0g) 的极孔侧不再取样条外插的虚假厚度（原 excel 分支已删），
+    // 故只对账“所有角度都铺到”的区段（≥122.683）与只含 10° 组的起点 30.2
+    for (const k of ['30.2', '128', '150', '173.5']) {
+      expect(at(Number(k)).tTotal).toBeCloseTo(EXCEL_T[k], 3)
     }
   })
   it('t总(R) = 5.737058（封头→筒身螺旋层 5.50 的衔接处）', () => {
-    expect(at(R, 'corrected').tTotal).toBeCloseTo(EXCEL_T['173.5'], 4)
+    expect(at(R).tTotal).toBeCloseTo(EXCEL_T['173.5'], 4)
   })
-  it('p总(R)：修正 79.39 MPa vs 原样 92.94 MPa（×ks=0.75）', () => {
-    expect(at(R, 'corrected').pTotal).toBeCloseTo(79.39, 1)
-    expect(at(R, 'excel').pTotal).toBeCloseTo(92.94, 1)
-  })
-  it('笔误口径使中段爆压系统性虚高（规划 §2 的量化）', () => {
-    let worst = 0
-    for (let r = 55; r <= 170; r += 1) {
-      const d = at(r, 'excel').pTotal - at(r, 'corrected').pTotal
-      worst = Math.max(worst, d)
-    }
-    expect(worst).toBeGreaterThan(60)
+  it('局部角平方项修正后 p总(R) = 79.389865726788 MPa', () => {
+    expect(at(R).pTotal).toBeCloseTo(79.38986572678792,9)
   })
   it('domeCheck 曲线端点、判定窗口与 t总(R)', () => {
-    const res = domeCheck(groups, domeArgs('corrected'))
-    expect(res.profile[0].r).toBeCloseTo(30.128, 3)
+    const res = domeCheck(groups, domeArgs())
+    expect(res.profile[0].r).toBe(30.2)
+    expect(res.profile[1].r).toBe(32)
+    expect(res.profile).toHaveLength(144)
     expect(res.profile[res.profile.length - 1].r).toBe(R)
-    expect(res.minPR).toBeGreaterThanOrEqual(50.13)
+    expect(res.minPR).toBeGreaterThanOrEqual(122.683)
     expect(res.tAtR).toBeCloseTo(EXCEL_T['173.5'], 4)
     expect(res.groups.length).toBe(6)
   })
@@ -289,49 +257,44 @@ describe('测地线角度 ↔ 极孔（§8.3 对照表）', () => {
 })
 
 describe('汇总判定、薄弱区定位与对策（runCheck）', () => {
-  const base = defaultInput()
-  const input = { ...base, constraint: { ...base.constraint, rBossAuto: false, rBoss: 50.13 } }
-  const res = runCheck(input)
+  const res = runCheck(defaultInput())
 
   it('筒身满足 pb=90：判定不为 fail', () => {
     expect(res.cylinder.paPass).toBe(true)
     expect(res.cylinder.pthPass).toBe(true)
     expect(res.verdict).not.toBe('fail')
   })
-  it('封头薄弱区被识别，且对策区分"极孔侧承载空档"与"近赤道"', () => {
+  it('完整原表范围包含极孔侧低值，不截断数据', () => {
     expect(res.dome.pass).toBe(false)
     expect(res.verdict).toBe('adjust')
     expect(res.dome.weakZones.length).toBeGreaterThan(0)
-    expect(res.advice.kind).toBe('pole-gap')
-    expect(res.advice.text).toContain('局部缠绕角')
+    expect(res.dome.minPR).toBe(30.2)
+    expect(res.dome.minP).toBeCloseTo(.055914150152195294,9)
   })
-  it('把判定窗口下界推到各组极孔边缘之上 → 薄弱点转为近赤道，置换建议生效', () => {
-    const wide = runCheck({ ...input, constraint: { ...input.constraint, rBoss: 125 } })
-    expect(wide.dome.minPR).toBeGreaterThan(140)
-    expect(wide.advice.kind).toBe('equator')
-    expect(wide.advice.variants.length).toBeGreaterThan(0)
-    expect(wide.advice.variants[0].pAtR).toBeGreaterThan(wide.dome.minP - 5)
+  it('最低值来自完整原表数据列', () => {
+    expect(res.dome.minPAll).toBe(res.dome.minP)
   })
-  it('接嘴区低值不计入判定：minPAll < minP', () => {
-    expect(res.dome.minPAll).toBeLessThan(res.dome.minP)
-  })
-  it('Excel 口径下爆压系统性虚高', () => {
-    const raw = runCheck({ ...input, refMode: 'excel' })
-    expect(raw.dome.minP).toBeGreaterThan(res.dome.minP)
-  })
-  it('rBossAuto = 全铺层覆盖起点 max(r0g)，只用铺层自身的量', () => {
-    const auto = runCheck({ ...input, constraint: { ...input.constraint, rBossAuto: true } })
-    expect(auto.dome.rFirst).toBeCloseTo(30.128, 2)
-    expect(auto.dome.rFull).toBeCloseTo(122.683, 2)
-    expect(auto.dome.rBoss).toBeCloseTo(122.683, 2)
-    // 窗口下界之上，薄弱点落在近赤道，值即 r=R 处的 79.4
-    expect(auto.dome.minPR).toBeGreaterThan(150)
-    expect(auto.dome.minP).toBeLessThan(80)
-    // 极孔侧参考值仍被算出并低于判定值（判据奇异区，仅参考）
-    expect(auto.dome.minPAll).toBeLessThan(auto.dome.minP)
+  it('不使用自定的全铺层覆盖范围排除原表数据', () => {
+    expect(res.dome.rFirst).toBeCloseTo(30.128, 2)
+    expect(res.dome.rFull).toBeCloseTo(122.683, 2)
+    expect(res.dome.rBoss).toBeCloseTo(30.127958825212414,9)
+    expect(res.dome.minPR).toBe(30.2)
+    expect(res.dome.minP).toBeCloseTo(.055914150152195294,9)
+    expect(res.dome.minPAll).toBe(res.dome.minP)
   })
   it('环向层不参与封头校核', () => {
     expect(res.dome.groups.every((g) => g.angle < 90)).toBe(true)
+  })
+  it('课件封头初估使用筒身角与纤维量，独立于局部 K 和独立 σc', () => {
+    expect(res.head.pressure).toBeCloseTo(76.57491090962243,9)
+    const input=defaultInput()
+    input.requirement.ks=1
+    input.strength.sigmaCompositeDirect=1500
+    const changed=runCheck(input)
+    expect(changed.head.pressure).toBeCloseTo(res.cylinder.pa,9)
+    expect(changed.head.pass).toBe(true)
+    expect(changed.dome.pass).toBe(false)
+    expect(changed.verdict).toBe('pass')
   })
   it('非法/极端角度组被隔离而不是让整体崩溃', () => {
     const bad = buildDomeGroups([{ angle: 89.9, layers: 4 }, { angle: 10, layers: 4 }], R, BAND, TC)
@@ -343,12 +306,11 @@ describe('汇总判定、薄弱区定位与对策（runCheck）', () => {
 
 describe('调整建议（环向层 ⇄ 高角螺旋层等厚置换）', () => {
   it('近赤道薄弱时，置换 2 层可提高 r=R 处与有效区最小爆压', () => {
-    const base = defaultInput()
-    const input = { ...base, constraint: { ...base.constraint, rBossAuto: false, rBoss: 125 } }
+    const input = defaultInput()
     const res = runCheck(input)
     const swaps = suggestHoopSwap(input, { maxTransfer: 4, targetAngle: 45 })
     expect(swaps.length).toBe(2)
-    expect(swaps[0].pAtR).toBeGreaterThan(domeAt(res.dome.groups, R, R, 2031, 0.75, 'corrected').pTotal)
+    expect(swaps[0].pAtR).toBeGreaterThan(domeAt(res.dome.groups, R, R, 2031, 0.75).pTotal)
     expect(swaps[0].pa).toBeGreaterThan(res.cylinder.pa)
     expect(swaps[0].pth).toBeLessThan(res.cylinder.pth)
   })

@@ -7,7 +7,8 @@
  */
 import type { ReactNode } from 'react'
 
-const RE = /_([A-Za-z0-9\u4e00-\u9fa5]+)/g
+// 下标内容：字母、数字、希腊字母（p_α、p_θ）、中文（σ_发挥）；下标后紧跟中文时须留空格或标点
+const RE = /_([A-Za-z0-9\u0370-\u03ff\u4e00-\u9fa5]+)/g
 
 interface Seg {
   s: string

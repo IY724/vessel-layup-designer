@@ -280,6 +280,179 @@ export function matchLineType(thetaDeg: number, opts: { maxDeviation?: number } 
     .slice(0, 5)
 }
 
+// ── 容积驱动的线型切点设计：V → Φ=f(D) → 与线型表求交（论文设计顺序）──────────
+//
+// 论文真正的顺序不是"先定尺寸再校核线型"，而是：已知容积 V（硬约束）→ 由 V 把
+// 筒身段长度 l 绑在 D 上 → 得到一条光滑曲线 Φ(D)（Φ = 双程转角 θ_n）→ 把线型表
+// 允许的转角画成水平线切过去 → 交点即候选方案（D、l 同时确定）→ 用户按长径比与
+// 切点数自己挑。选定某一档的瞬间，内胆几何尺寸与数控速比参数一起定型。
+
+/** 设计曲线的基参数：不锁 l，l 由容积与 D 唯一确定 */
+export interface DesignBase {
+  /** 封头轴比 λ = a/b */
+  lambda: number
+  /** 极孔半径 r₀ (mm) */
+  r0: number
+  /** 阀座容积折减 K_f */
+  Kf: number
+}
+
+/** 设计曲线上的一个点：给定 D，容积 V 唯一确定 l，进而唯一确定双程转角 Φ */
+export interface DesignPoint {
+  /** 外径 D = 2·R_in */
+  D: number
+  /** 筒身内半径 R_in */
+  R: number
+  /** 筒身段长度 l（由容积反解） */
+  l: number
+  /** 双程转角 Φ = θ_n */
+  theta: number
+  /** 长径比 l/D */
+  ratio: number
+}
+
+/** 由容积与筒身内半径反解筒身段长度：V = πR²[(4/3)K_f·R/λ + l]（朱宁式2.6 反解） */
+export function lengthFromVolume(R_in: number, lambda: number, Kf: number, volumeMm3: number): number {
+  const head = ((4 * Math.PI) / 3) * Kf * R_in * R_in * (R_in / lambda)
+  return (volumeMm3 - head) / (Math.PI * R_in * R_in)
+}
+
+/** 容积被两个封头占满（l = 0）时的内半径上限：V = (4π/3)K_f·R³/λ */
+export function maxInnerRadius(volumeL: number, lambda: number, Kf: number): number {
+  const V = volumeL * 1e6
+  return Math.cbrt((3 * V * lambda) / (4 * Math.PI * Kf))
+}
+
+/** 给定内半径下的双程转角（设计曲线/求根共用；不在可行域返回 NaN） */
+function thetaAtR(base: DesignBase, volumeMm3: number, R: number): number {
+  if (!(R > base.r0)) return NaN
+  const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3)
+  if (!(l > 0)) return NaN
+  return windingTurns({ R_in: R, l, lambda: base.lambda, r0: base.r0, Kf: base.Kf }).roundTrip
+}
+
+/**
+ * 由目标容积导出 Φ = f(D) 设计曲线（论文 ①→②）。
+ * 只在 l(D) > 0 的可行域内取点。已验证：Φ 在内半径增大时单调减
+ * （如 λ=2、r₀=36、K_f=0.8、V≈77.4 L 时 R_in=120→Φ≈822°、135→≈632°、145→≈554°）。
+ */
+export function designCurve(
+  base: DesignBase,
+  volumeL: number,
+  opts: { dMin?: number; dMax?: number; samples?: number } = {},
+): DesignPoint[] {
+  const volumeMm3 = volumeL * 1e6
+  const Rmax = maxInnerRadius(volumeL, base.lambda, base.Kf)
+  const dMax = opts.dMax ?? 2 * Rmax * 0.999
+  const dMin = opts.dMin ?? 2 * Math.max(base.r0 * 1.002, Rmax * 0.5)
+  const samples = opts.samples ?? 120
+  const out: DesignPoint[] = []
+  for (let i = 0; i <= samples; i++) {
+    const D = dMin + ((dMax - dMin) * i) / samples
+    const R = D / 2
+    const theta = thetaAtR(base, volumeMm3, R)
+    if (!Number.isFinite(theta)) continue
+    const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3)
+    out.push({ D, R, l, theta, ratio: l / D })
+  }
+  return out
+}
+
+export interface ThetaSolve {
+  ok: boolean
+  D: number
+  R: number
+  l: number
+  theta: number
+  reason?: string
+}
+
+/**
+ * 反解：给定目标双程转角 Φ*，在容积约束下求对应的 D（及 l）。
+ * 因 Φ(D) 单调减，用二分求根；目标超出可达区间时明确报无解（不返回半成品）。
+ */
+export function solveForTheta(base: DesignBase, volumeL: number, thetaTarget: number): ThetaSolve {
+  const volumeMm3 = volumeL * 1e6
+  const Rmax = maxInnerRadius(volumeL, base.lambda, base.Kf)
+  const lo = base.r0 * 1.002 // 转角最大端（R→r₀，Φ→∞）
+  const hi = Rmax * 0.999 // 转角最小端（l→0）
+  const tLo = thetaAtR(base, volumeMm3, lo)
+  const tHi = thetaAtR(base, volumeMm3, hi)
+  if (!Number.isFinite(tLo) || !Number.isFinite(tHi)) {
+    return { ok: false, D: 0, R: 0, l: 0, theta: NaN, reason: '可达区间无法计算' }
+  }
+  if (thetaTarget > tLo || thetaTarget < tHi) {
+    return {
+      ok: false,
+      D: 0,
+      R: 0,
+      l: 0,
+      theta: NaN,
+      reason: `目标转角 ${thetaTarget.toFixed(0)}° 超出可达区间 [${tHi.toFixed(0)}°, ${tLo.toFixed(0)}°]`,
+    }
+  }
+  let a = lo
+  let b = hi
+  for (let i = 0; i < 200; i++) {
+    const m = (a + b) / 2
+    const t = thetaAtR(base, volumeMm3, m)
+    if (!Number.isFinite(t)) break
+    if (t > thetaTarget) a = m
+    else b = m
+  }
+  const R = (a + b) / 2
+  const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3)
+  return { ok: true, D: 2 * R, R, l, theta: thetaAtR(base, volumeMm3, R) }
+}
+
+/** 从线型表里挑出落在 [thetaLow, thetaHigh]、切点数 ≤ maxN 的允许档位 */
+export function allowedLineTypes(thetaLow = 450, thetaHigh = 660, maxN = 4): LineTypeRow[] {
+  return lineTypeTable(maxN).filter((r) => r.theta >= thetaLow && r.theta <= thetaHigh)
+}
+
+export interface LineTypeCandidate {
+  /** 目标双程转角（线型表档位） */
+  theta: number
+  /** 切点数 n */
+  n: number
+  K: number
+  m: number
+  /** 反解出的外径 */
+  D: number
+  R: number
+  /** 反解出的筒身段长度 */
+  l: number
+  ratio: number
+  /** 曲线实际转角（≈theta）与偏差 */
+  thetaActual: number
+  dev: number
+}
+
+/**
+ * 求交（论文 ③→④）：把允许转角画成水平线，与 Φ(D) 曲线求交，得到候选方案。
+ * 每个允许档位最多一个交点（Φ 单调减）。**不排序、不推荐**——选哪档由用户照表自己定。
+ */
+export function intersectLineTypes(base: DesignBase, volumeL: number, allowed: LineTypeRow[]): LineTypeCandidate[] {
+  const out: LineTypeCandidate[] = []
+  for (const row of allowed) {
+    const s = solveForTheta(base, volumeL, row.theta)
+    if (!s.ok) continue
+    out.push({
+      theta: row.theta,
+      n: row.n,
+      K: row.K,
+      m: row.m,
+      D: s.D,
+      R: s.R,
+      l: s.l,
+      ratio: s.l / s.D,
+      thetaActual: s.theta,
+      dev: s.theta - row.theta,
+    })
+  }
+  return out
+}
+
 /** 常用区间提示（只给判据，来源标注见 docs/DESIGN.md） */
 export function geometryChecks(p: VolumeParams): Array<{ level: 'ok' | 'warn'; text: string }> {
   const out: Array<{ level: 'ok' | 'warn'; text: string }> = []
@@ -296,7 +469,7 @@ export function geometryChecks(p: VolumeParams): Array<{ level: 'ok' | 'warn'; t
   const r0d = p.r0 / (2 * p.R_in)
   out.push({
     level: r0d > 0.2 || r0d < 0.05 ? 'warn' : 'ok',
-    text: `极孔比 r₀/D = ${r0d.toFixed(3)}，常用 0.05~0.20`,
+    text: `极孔比 r_0/D = ${r0d.toFixed(3)}，常用 0.05~0.20`,
   })
   return out
 }

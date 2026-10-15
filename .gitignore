@@ -1,5 +1,11 @@
 node_modules
 dist
+release
 *.local
 .DS_Store
 .vite
+
+# 本地会话产物与站点描述文件，不进仓库
+.playwright-cli/
+output/
+*.qoder.site

@@ -162,7 +162,7 @@ export function AutoDesignModal({ input, onApply, onClose }: { input: DesignInpu
               <span className="unit" />
             </div>
             {d.requirement.pbMode === 'direct' ? (
-              <N k="pb" label="设计爆压 pb" value={d.requirement.pb} unit="MPa" step={1} on={(v) => req({ pb: v })} />
+              <N k="pb" label="设计爆压 p_b" value={d.requirement.pb} unit="MPa" step={1} on={(v) => req({ pb: v })} />
             ) : (
               <>
                 <N k="workingPressure" label="工作压力" value={d.requirement.workingPressure} unit="MPa" step={1} on={(v) => req({ workingPressure: v })} />
@@ -175,9 +175,9 @@ export function AutoDesignModal({ input, onApply, onClose }: { input: DesignInpu
             <N k="fiberDensity" label="纤维密度" value={d.material.fiberDensity} unit="g/cm³" step={0.05} on={(v) => mat({ fiberDensity: v })} />
             <N k="bandWidth" label="单束带宽 b" value={d.material.bandWidth} unit="mm" step={0.5} on={(v) => mat({ bandWidth: v })} />
             <N k="strandCount" label="每束纱数 n" value={d.material.strandCount} unit={`→ ${f(dp.bandTotal, 1)} mm`} step={1} on={(v) => mat({ strandCount: v })} />
-            <N k="vf" label="纤维体积含量 Vf" value={d.material.vf} step={0.01} on={(v) => mat({ vf: v })} />
+            <N k="vf" label="纤维体积含量 V_f" value={d.material.vf} step={0.01} on={(v) => mat({ vf: v })} />
             <div className="hint span">
-              单层纤维厚 tf = <b>{f(dp.tf)}</b> mm，含树脂单层厚 tc = <b>{f(dp.tc)}</b> mm（生成时按这个厚度累加）
+              单层纤维厚 {sym('t_f')} = <b>{f(dp.tf)}</b> mm，含树脂单层厚 {sym('t_c')} = <b>{f(dp.tc)}</b> mm（生成时按这个厚度累加）
             </div>
 
             <div className="dlg-sec">强度</div>
@@ -207,8 +207,8 @@ export function AutoDesignModal({ input, onApply, onClose }: { input: DesignInpu
               </>
             )}
             <div className="hint span">
-              纤维发挥强度 螺旋 <b>{f(dp.sigmaSpiral, 1)}</b> / 环向 <b>{f(dp.sigmaHoop, 1)}</b> MPa，复材层强度 <b>{f(dp.sigmaComposite, 1)}</b> MPa，
-              目标爆压 <b>{f(dp.pb, 2)}</b> MPa
+              纤维发挥强度 螺旋 <b>{f(dp.sigmaSpiral, 1)}</b> / 环向 <b>{f(dp.sigmaHoop, 1)}</b> MPa，复材层强度 {sym('σ_c')} <b>{f(dp.sigmaComposite, 1)}</b> MPa，
+              目标爆压 {sym('p_b')} <b>{f(dp.pb, 2)}</b> MPa
             </div>
 
             <div className="dlg-sec">铺层怎么铺</div>

@@ -24,7 +24,14 @@ import {
   checkJoint,
   bossZoneRadius,
   PLUGIN_JOINT_DEFAULT,
+  designCurve,
+  solveForTheta,
+  intersectLineTypes,
+  allowedLineTypes,
+  lengthFromVolume,
+  maxInnerRadius,
   type VolumeParams,
+  type DesignBase,
 } from '../src/core/geometry'
 
 /** 朱宁 2023 式(2.6) 的算例 */
@@ -236,5 +243,58 @@ describe('Ⅳ型瓶接头尺寸设计（对齐 type4_builder_kernel.py 默认参
     expect(d.rCl).not.toBe(j.r0)
     expect(bossZoneRadius(d, j).r_sp).toBe(90)
     expect(bossZoneRadius(d, j).suggest).toBeCloseTo(d.rCl, 6)
+  })
+})
+
+describe('容积驱动的线型切点设计（V → Φ=f(D) → 与线型表求交）', () => {
+  // 论文算例口径：V≈77.4 L（=78 L 量级）、λ=2、r₀=36、K_f=0.8
+  const base: DesignBase = { lambda: 2, r0: 36, Kf: 0.8 }
+  const V = 77.4
+
+  it('长度反解 lengthFromVolume：R_in=135 时 l≈1280 mm', () => {
+    expect(lengthFromVolume(135, 2, 0.8, V * 1e6)).toBeCloseTo(1280, 0)
+  })
+
+  it('maxInnerRadius：封头填满容积的半径上限 ≈ 358.8 mm', () => {
+    expect(maxInnerRadius(V, 2, 0.8)).toBeCloseTo(358.8, 0)
+  })
+
+  it('designCurve：在可行域内 Φ 随 D 单调减，且覆盖 632°', () => {
+    const curve = designCurve(base, V, { dMin: 240, dMax: 310 })
+    expect(curve.length).toBeGreaterThan(10)
+    expect(curve.every((p, i) => i === 0 || p.theta <= curve[i - 1].theta + 1e-6)).toBe(true)
+    const thetas = curve.map((p) => p.theta)
+    expect(Math.max(...thetas)).toBeGreaterThan(700)
+    expect(Math.min(...thetas)).toBeLessThan(560)
+  })
+
+  it('solveForTheta(632°) → R_in≈135、D≈270（论文 630°/4切点）', () => {
+    const s = solveForTheta(base, V, 632)
+    expect(s.ok).toBe(true)
+    expect(s.R).toBeCloseTo(134.9, 0)
+    expect(s.D).toBeCloseTo(269.8, 0)
+    expect(s.theta).toBeCloseTo(632, 2)
+  })
+
+  it('目标转角超出可达区间时明确报无解', () => {
+    const s = solveForTheta(base, V, 100)
+    expect(s.ok).toBe(false)
+    expect(s.reason).toContain('超出可达区间')
+  })
+
+  it('allowedLineTypes 给出 450/480/540/600/630 五档', () => {
+    expect(allowedLineTypes(450, 660, 4).map((r) => r.theta)).toEqual([450, 480, 540, 600, 630])
+  })
+
+  it('intersectLineTypes：630° 档对应 4 切点、D≈270、长径比≈4.7', () => {
+    const cands = intersectLineTypes(base, V, allowedLineTypes(450, 660, 4))
+    expect(cands.map((c) => c.theta)).toEqual([450, 480, 540, 600, 630])
+    const c630 = cands.find((c) => c.theta === 630)!
+    expect(c630.n).toBe(4)
+    expect(c630.K).toBe(3)
+    expect(c630.m).toBe(1)
+    expect(c630.D).toBeCloseTo(270, 0)
+    expect(c630.ratio).toBeCloseTo(4.73, 1)
+    expect(Math.abs(c630.dev)).toBeLessThan(0.01)
   })
 })

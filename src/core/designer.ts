@@ -122,7 +122,7 @@ export function autoDesign(input: DesignInput): AutoResult {
     const c = cylinderCheck(cur, a)
     return {
       ok: false,
-      reason: `候选角集无法同时满足双向要求：pα=${c.pa.toFixed(2)}（差 ${(pb - c.pa).toFixed(2)}）、pθ=${c.pth.toFixed(2)}（差 ${(pb - c.pth).toFixed(2)}）`,
+      reason: `候选角集无法同时满足双向要求：p_α=${c.pa.toFixed(2)}（差 ${(pb - c.pa).toFixed(2)}）、p_θ=${c.pth.toFixed(2)}（差 ${(pb - c.pth).toFixed(2)}）`,
       trace,
     }
   }
@@ -168,24 +168,24 @@ export function autoDesign(input: DesignInput): AutoResult {
   for (let round = 0; round < 8; round++) {
     const trial: DesignInput = { ...input, plan: final }
     const res = runCheck(trial)
-    if (res.dome.pass) {
-      trace.push(`封头校核通过：min=${res.dome.minP.toFixed(1)} MPa @ r≈${res.dome.minPR.toFixed(1)}（窗口 r≥${effectiveRBoss(trial).toFixed(1)}）`)
+    if (res.head.pass) {
+      trace.push(`封头经验初估满足设计值：${res.head.pressure.toFixed(1)} MPa`)
       break
     }
     if (res.advice.kind !== 'equator' || !res.advice.variants.length) {
-      trace.push(`封头薄弱点为${res.advice.kind === 'pole-gap' ? '各组极孔边缘的固有低载区（置换无效，已如实报告）' : '不可通过置换解决'}：min=${res.dome.minP.toFixed(1)} MPa`)
+      trace.push(`封头经验初估 ${res.head.pressure.toFixed(1)} MPa：无可行的等厚置换方案`)
       break
     }
     // 只在"置换后筒身双向仍然达标"的候选里挑封头收益最大的：
     // 环向层是 pθ 的主力，换多了会把筒身环向换穿，必须回查
     const usable = res.advice.variants.filter((v) => v.pa >= pb - 1e-9 && v.pth >= pb - 1e-9)
     if (!usable.length) {
-      trace.push(`封头反馈停止：任何环向⇄高角螺旋置换都会使筒身不再双向达标，保留当前方案（min=${res.dome.minP.toFixed(1)} MPa）`)
+      trace.push(`封头反馈停止：筒身双向约束不允许置换；封头初估 ${res.head.pressure.toFixed(1)} MPa`)
       break
     }
-    const best = usable.reduce((x, y) => (y.minP > x.minP ? y : x))
-    if (best.minP <= res.dome.minP + 1e-6) {
-      trace.push(`封头反馈停止：置换已到极限，min=${res.dome.minP.toFixed(1)} MPa < pb=${pb.toFixed(1)}`)
+    const best = usable.reduce((x, y) => (y.headPressure > x.headPressure ? y : x))
+    if (best.headPressure <= res.head.pressure + 1e-6) {
+      trace.push(`封头反馈停止：置换已到极限，初估 ${res.head.pressure.toFixed(1)} MPa < p_b=${pb.toFixed(1)}`)
       break
     }
     const hit = final.spiral.find((g) => Math.abs(g.angle - target) < 1e-9)
@@ -195,7 +195,7 @@ export function autoDesign(input: DesignInput): AutoResult {
         ? final.spiral.map((g) => (g.angle === target ? { ...g, layers: g.layers + best.transfer } : g))
         : [...final.spiral, { angle: target, layers: best.transfer }],
     }
-    trace.push(`封头反馈第${round + 1}轮：环向 −${best.transfer} ⇄ ${target}° +${best.transfer} → 预计 min ${best.minP.toFixed(1)}`)
+    trace.push(`封头反馈第${round + 1}轮：环向 −${best.transfer} ⇄ ${target}° +${best.transfer} → 封头初估 ${best.headPressure.toFixed(1)} MPa`)
   }
 
   // 兜底：反馈后的方案必须仍满足筒身双向要求，否则退回删层结果
@@ -219,7 +219,6 @@ export function planPressures(input: DesignInput, plan: LayupPlan) {
     tc: d.tc,
     sigmaComposite: d.sigmaComposite,
     ks: input.requirement.ks,
-    refMode: input.refMode,
     rBoss: effectiveRBoss(input),
     pb: d.pb,
   })

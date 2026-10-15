@@ -1,14 +1,4 @@
-/**
- * checker.ts — 汇总校核：筒身 + 封头 + 一致性检查 + 薄弱区诊断 + 调整建议
- *
- * 判定口径（重要，界面必须如实标注）：
- *   筒身：pα ≥ pb 且 pθ ≥ pb（网格理论等厚，与长度无关）
- *   封头：min{ ks·Σp_g(r) | r ∈ [r_boss, R] } ≥ pb
- *     判定窗口 [r_boss, R]，r_boss 默认 = 全铺层覆盖起点 max(r0g)（只用铺层自身的量）；
- *     窗口之外的极孔侧区段 [min(r0g), r_boss) 仅部分角度组覆盖、局部角趋于 90°，
- *     按 cos²α 判据必然趋于 0，故只画出来、报出数值，不作为通过/不通过的判据。
- *     r → R 处封头公式与筒身公式重合，筒身判定不乘 ks（口径更合理），故封头曲线末端的低值以"×ks 偏保守"标注
- */
+/** 筒身原表计算、课件封头经验初估与完整局部参考曲线。 */
 import type {
   Advice,
   CylinderResult,
@@ -26,21 +16,13 @@ import { cylinderCheck } from './netting'
 import { buildDomeGroups, domeCheck } from './dome'
 import { checkPoleConsistency, poleRadius } from './geodesic'
 
-/**
- * 判定窗口下界 r_boss。
- * auto = 全铺层覆盖起点 max(r0g)：所有螺旋角组都已铺到的最小平行圆，
- * 只用铺层自身的量，不引入接头/阀座半径。
- * 不用 min(r0g)（复合层最小平行圆）是因为那里 cos²α→0，判据必然退化为 0。
- */
+/** 原表半径列起点；不采用自定的强度检查截断区。 */
 export function effectiveRBoss(input: DesignInput): number {
-  const { constraint, plan } = input
-  if (!constraint.rBossAuto) return constraint.rBoss
-  const r0s = plan.spiral.filter((g) => g.layers > 0).map((g) => poleRadius(input.geometry.R, g.angle))
-  return r0s.length ? Math.max(...r0s) : 0
-}
-
-function totalBand(input: DesignInput): number {
-  return input.material.strandCount * input.material.bandWidth
+  const r0s = input.plan.spiral
+    .filter((g) => g.active !== false && g.layers > 0 && g.angle < 90)
+    .map((g) => poleRadius(input.geometry.R, g.angle))
+  // 原表完整半径列参与汇总，不另设软件自定的强度判定截断区。
+  return r0s.length ? Math.min(...r0s) : 0
 }
 
 /** 封头→筒身 椭圆子午线（仅用于重量参考值与轮廓绘制；短半轴取记录值） */
@@ -81,6 +63,7 @@ export interface PlanEvaluation {
   derived: DerivedParams
   cylinder: CylinderResult
   dome: DomeResult
+  head: CheckResult['head']
   rBoss: number
 }
 
@@ -109,17 +92,20 @@ export function evaluatePlan(input: DesignInput): PlanEvaluation {
       tc: derived.tc,
       sigmaComposite: derived.sigmaComposite,
       ks: requirement.ks,
-      refMode: input.refMode,
       rBoss,
       pb: derived.pb,
     },
     failed,
   )
-  return { derived, cylinder, dome, rBoss }
+  // 课件第六课第 2 页：h_fα 为纯纤维厚度，α₀ 为筒身角。
+  // 多组逐项求和与筒身纵向贡献相同，仅再乘 ks；不用局部 K 或独立 σc。
+  const pressure = requirement.ks * cylinder.pa
+  const head = { pressure, pass: pressure >= derived.pb }
+  return { derived, cylinder, dome, head, rBoss }
 }
 
 export function runCheck(input: DesignInput): CheckResult {
-  const { derived, cylinder, dome, rBoss } = evaluatePlan(input)
+  const { derived, cylinder, dome, head } = evaluatePlan(input)
   const { geometry, plan } = input
   const R = geometry.R
   const diagnoses: Diagnosis[] = []
@@ -131,7 +117,6 @@ export function runCheck(input: DesignInput): CheckResult {
     domeSpiralAtR,
     cylinderSpiral,
     diff,
-    ok: cylinderSpiral > 0 ? Math.abs(diff) / cylinderSpiral < 0.08 : true,
   }
 
   const weight = weightEstimate(
@@ -141,7 +126,7 @@ export function runCheck(input: DesignInput): CheckResult {
   )
 
   // ---- 诊断 ----
-  const angles = plan.spiral.filter((g) => g.layers > 0).map((g) => g.angle)
+  const angles = plan.spiral.filter((g) => g.active !== false && g.layers > 0).map((g) => g.angle)
   if (angles.length) {
     const chk = checkPoleConsistency(R, derived.r0, Math.min(...angles), derived.bandTotal)
     diagnoses.push({ level: chk.level, text: chk.text })
@@ -160,49 +145,26 @@ export function runCheck(input: DesignInput): CheckResult {
       text: `筒身环向爆压不足：算得 ${cylinder.pth.toFixed(2)} MPa < 目标 ${derived.pb.toFixed(2)} MPa，缺口 ${(derived.pb - cylinder.pth).toFixed(2)} MPa`,
     })
   }
-  if (!dome.pass) {
-    const wz = dome.weakZones[0]
+  if (!head.pass) {
     diagnoses.push({
       level: 'warn',
-      text:
-        `封头存在薄弱处：判定范围 r ∈ [${rBoss.toFixed(1)}, ${R.toFixed(1)}] mm 内最低爆压 ${dome.minP.toFixed(1)} MPa` +
-        ` @ r=${dome.minPR.toFixed(1)}，低于目标 ${derived.pb.toFixed(1)} MPa` +
-        (wz ? `（低载区 r≈${wz.from.toFixed(1)}~${wz.to.toFixed(1)} mm）` : ''),
-    })
-  }
-  if (!consistency.ok) {
-    diagnoses.push({
-      level: 'warn',
-      text: `封头与筒身衔接检查：封头赤道处总厚 ${domeSpiralAtR.toFixed(3)} mm 与筒身螺旋层厚 ${cylinderSpiral.toFixed(3)} mm 偏差 ${diff >= 0 ? '+' : ''}${diff.toFixed(3)} mm（>8%），铺层在封头/筒身衔接处可能不连续`,
+      text: `封头经验初估 ${head.pressure.toFixed(2)} MPa，低于设计值 ${derived.pb.toFixed(2)} MPa。`,
     })
   }
   for (const f of dome.failedGroups) {
     if (f.angle >= 90) continue
     diagnoses.push({ level: 'error', text: f.reason })
   }
-  if (input.refMode === 'excel') {
-    diagnoses.push({
-      level: 'warn',
-      text: '当前用的是参考表原算法：封头公式少一个右括号（cos(u·cos u)），中段爆压会系统性虚高（最大 +86 MPa），只能用于逐格对账，不能作为设计依据',
-    })
-  }
-  if (dome.minPAll < dome.minP && dome.minPAll < derived.pb) {
-    diagnoses.push({
-      level: 'ok',
-      text: `极孔侧参考值：r ∈ [${dome.rFirst.toFixed(1)}, ${rBoss.toFixed(1)}) 只有一部分角度组铺得到，` +
-        `局部缠绕角趋于 90°，按 cos²α 计算必然趋于 0，属算法在此处失效而非真实薄弱截面，故不计入判定`,
-    })
-  }
 
   const verdict: CheckResult['verdict'] = !cylinder.paPass || !cylinder.pthPass
     ? 'fail'
-    : dome.pass
+    : head.pass
       ? 'pass'
       : 'adjust'
 
-  const advice = buildAdvice(input, dome, rBoss)
+  const advice = buildAdvice(input, head)
 
-  return { derived, cylinder, dome, consistency, weight, verdict, diagnoses, advice }
+  return { derived, cylinder, dome, head, consistency, weight, verdict, diagnoses, advice }
 }
 
 /**
@@ -235,6 +197,7 @@ export function suggestHoopSwap(
       minP: res.dome.minP,
       minPR: res.dome.minPR,
       pAtR: last ? last.pTotal : 0,
+      headPressure: res.head.pressure,
       pa: res.cylinder.pa,
       pth: res.cylinder.pth,
       totalThickness: res.cylinder.totalThickness,
@@ -243,41 +206,20 @@ export function suggestHoopSwap(
   return out
 }
 
-/**
- * 薄弱区定位与对策建议。
- * 修正口径（cos²α）下，每组在自己极孔边缘 α_local→90°，纵向承载趋零，
- * 曲线会在每个 r0g 正上方出现一个"承载空档谷"——这与 Excel 笔误口径的形态完全不同，
- * 因此必须区分两类薄弱点，给出不同对策。
- */
-function buildAdvice(input: DesignInput, dome: DomeResult, rBoss: number): Advice {
-  if (dome.pass) return { kind: 'none', text: '封头有效区最小爆压满足设计要求', variants: [] }
-  const band = totalBand(input)
-  const nearPole = dome.minPR < dome.rFull - 1e-9
-  const nearEquator = dome.minPR > input.geometry.R - 1.5 * band
-  const last = dome.profile[dome.profile.length - 1]
-  if (nearPole && !nearEquator) {
-    return {
-      kind: 'pole-gap',
-      text:
-        `薄弱点在 r≈${dome.minPR.toFixed(1)}，比"所有角度都铺到"的最小平行圆 r≈${dome.rFull.toFixed(1)} 更靠近极孔：` +
-        '该区段只有一部分角度组铺得到，且各组局部缠绕角趋于 90°，纵向承载按 cos²α 趋于零，属算法在此处的失效。' +
-        `把判定范围下界改为自动取值（当前 ${rBoss.toFixed(1)} mm）后，薄弱点会落到可设计的截面区间。`,
-      variants: [],
-    }
-  }
-  const variants = suggestHoopSwap(input, { maxTransfer: 8 })
+/** 按课件经验初估试算；建议必须保留筒身双向要求。 */
+function buildAdvice(input: DesignInput, head: CheckResult['head']): Advice {
+  if (head.pass) return { kind: 'none', text: '封头经验初估满足设计值。', variants: [] }
+  const pb = deriveParams(input).pb
+  const variants = suggestHoopSwap(input, { maxTransfer: 8 }).filter(v => v.pa >= pb && v.pth >= pb)
   const best = variants.reduce<SwapVariant | null>(
-    (acc, v) => (!acc || v.minP > acc.minP ? v : acc),
+    (acc, v) => (!acc || v.headPressure > acc.headPressure ? v : acc),
     null,
   )
   return {
     kind: 'equator',
-    text:
-      `薄弱点在 r≈${dome.minPR.toFixed(1)}（靠赤道一侧）：环向层铺不进封头，` +
-      (best
-        ? `建议把 ${best.transfer} 层环向换成 ${Math.max(...input.constraint.candidates)}° 螺旋层（厚度不变），` +
-          `预计封头最低值 ${dome.minP.toFixed(1)} → ${best.minP.toFixed(1)} MPa，赤道处 ${(last?.pTotal ?? 0).toFixed(1)} → ${best.pAtR.toFixed(1)} MPa`
-        : '没有可置换的环向层，需直接增加高角度螺旋层'),
+    text: best
+      ? `等厚置换 ${best.transfer} 层：封头经验初估 ${head.pressure.toFixed(1)} → ${best.headPressure.toFixed(1)} MPa。`
+      : '现有环向层无可行的等厚置换方案，需调整螺旋铺层。',
     variants,
   }
 }

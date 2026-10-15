@@ -14,7 +14,7 @@
  * 模式 A 下两者相等（Excel 即此情形）；模式 B 允许分别给定（如 70MPa 案例 3859/4342）。
  */
 import type { CylinderResult, CylinderRow, LayupPlan } from './types'
-import { RAD } from './geodesic'
+import { CYLINDER_RAD as RAD } from './course'
 
 export function paUnit(angleDeg: number, tf: number, sigma: number, R: number): number {
   const c = Math.cos(angleDeg * RAD)
@@ -51,8 +51,8 @@ export function initialEstimate(
     tanRef: tan,
     hSpiral,
     hHoop,
-    nSpiral: Math.ceil(hSpiral / tf),
-    nHoop: Math.ceil(hHoop / tf),
+    nSpiral: hSpiral / tf,
+    nHoop: hHoop / tf,
     hTotal,
     /** Excel B33：估算复材总厚度 = 估算纤维总厚度 / Vf */
     tComposite: tc !== undefined ? (hTotal * tc) / tf : hTotal,
@@ -72,7 +72,8 @@ export interface CylinderArgs {
 export function cylinderCheck(plan: LayupPlan, a: CylinderArgs): CylinderResult {
   const rows: CylinderRow[] = []
   // 数组顺序 = 用户给定的缠绕先后顺序，不在此处重排（求和量与顺序无关，但图面与工艺真实性相关）
-  const spiral = plan.spiral.filter((g) => g.layers > 0 && g.angle > 0 && g.angle < 90)
+  // 非激活行（active === false）不参与计算
+  const spiral = plan.spiral.filter((g) => g.active !== false && g.layers > 0 && g.angle > 0 && g.angle < 90)
 
   let pa = 0
   let pth = 0

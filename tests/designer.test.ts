@@ -93,16 +93,14 @@ describe('自动生成', () => {
     }
   })
 
-  it('封头反馈只在近赤道薄弱时触发置换（极孔侧空档不空转）', () => {
+  it('封头反馈使用课件经验初估，并保留筒身双向约束', () => {
     const out = autoDesign({ ...base, plan: { spiral: [], hoop: 0 } })
     if (!out.ok) throw new Error(out.reason)
     const trace = out.trace.join(' ')
     const last = runCheck(withPlan(base, out.plan))
-    if (last.advice.kind === 'pole-gap') {
-      expect(trace).toContain('固有低载区')
-      expect(trace).not.toMatch(/封头反馈第1轮/)
-    } else {
-      expect(['equator', 'none']).toContain(last.advice.kind)
-    }
+    expect(trace).toMatch(/封头经验初估|封头初估/)
+    expect(trace).not.toMatch(/窗口|固有低载区|预计 min/)
+    expect(last.cylinder.paPass && last.cylinder.pthPass).toBe(true)
+    expect(out.verdict).toBe(last.verdict)
   })
 })

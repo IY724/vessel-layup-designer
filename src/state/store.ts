@@ -14,7 +14,15 @@ function load(): DesignInput {
     const raw = localStorage.getItem(KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as DesignInput
-      if (parsed?.geometry && parsed?.plan && parsed?.constraint) return parsed
+      if (parsed?.geometry && parsed?.plan && parsed?.constraint) {
+        const originalPlan=JSON.stringify(parsed.plan.spiral.map(g=>[g.angle,g.layers]))===JSON.stringify([[10,4],[17,4],[25,4],[37,2],[40,2],[45,2]])
+        if(originalPlan && parsed.geometry.R===173.5 && parsed.material.bandWidth*parsed.material.strandCount===20){
+          parsed.plan.spiral=parsed.plan.spiral.map(g=>g.angle===45&&g.splineEndRadius===undefined?{...g,splineEndRadius:163}:g)
+          if(parsed.constraint.manualSpiralEstimate===undefined)parsed.constraint.manualSpiralEstimate=14
+          if(parsed.constraint.manualHoopEstimate===undefined)parsed.constraint.manualHoopEstimate=24
+        }
+        return parsed
+      }
     }
   } catch {
     /* 隐私模式/无 localStorage：忽略，用默认模板 */

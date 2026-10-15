@@ -61,14 +61,13 @@ export function blankInput(): DesignInput {
       ks: 0.75,
     },
     constraint: {
+      manualSpiralEstimate: 14,
+      manualHoopEstimate: 24,
       candidates: [...CANDIDATE_ANGLES],
       angleRule: 'alternate',
       forceEvenSpiral: true,
-      rBoss: 50,
-      rBossAuto: true,
       alphaRef: 20,
     },
-    refMode: 'corrected',
     plan: {
       spiral: [
         { angle: 10, layers: 4 },
@@ -76,7 +75,7 @@ export function blankInput(): DesignInput {
         { angle: 25, layers: 4 },
         { angle: 37, layers: 2 },
         { angle: 40, layers: 2 },
-        { angle: 45, layers: 2 },
+        { angle: 45, layers: 2, splineEndRadius: 163 },
       ],
       hoop: 23,
     },

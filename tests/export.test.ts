@@ -1,163 +1,111 @@
-/**
- * export.test.ts — Excel 复刻导出的结构与公式校验
- *
- * 导出的是「活公式」，Excel 打开才重算，所以这里校验三件事：
- *   ① sheet 齐、地址与原表语义对齐；② 跨表求和的行偏移正确（最容易错的地方）；
- *   ③ 口径开关确实换公式。数值正确性由 baseline.test.ts 在 core 层保证。
- */
 import { describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
-import { buildWorkbook } from '../src/export/excel'
+import ExcelJS from 'exceljs'
+import { buildWorkbook, workbookBytes } from '../src/export/excel'
+import { compareCourse, courseReference } from '../src/export/courseComparison'
+import { FORMULAS } from '../src/core/excelRef'
+import images from '../src/export/formulaImages.json'
 import { runCheck } from '../src/core/checker'
 import { defaultInput } from '../src/core/presets'
 
-const input = defaultInput()
-const res = runCheck(input)
-const wb = buildWorkbook(input, res)
-const g10 = res.dome.groups.find((g) => g.angle === 10)!
+const input=defaultInput(),res=runCheck(input),raw=buildWorkbook(input,res)
 
-describe('工作簿结构', () => {
-  it('包含汇总、筒身、6 个角度组、总厚度、总爆破压强、说明', () => {
-    expect(wb.SheetNames).toEqual([
-      '方案汇总',
-      '筒身强度设计与计算',
-      '封头-10°',
-      '封头-17°',
-      '封头-25°',
-      '封头-37°',
-      '封头-40°',
-      '封头-45°',
-      '封头总厚度',
-      '封头总爆破压强',
-      '说明',
-    ])
+describe('课件原表逐格核对',()=>{
+  it('5990 个基准值保留，平方项与独立修正基准一致',()=>{
+    const cells=compareCourse(raw)
+    expect(cells).toHaveLength(5990)
+    expect(cells.filter(c=>!c.pass)).toEqual([])
+    expect(cells.every(c=>c.actual!==null)).toBe(true)
+    expect(cells.filter(c=>c.corrected).length).toBeGreaterThan(0)
+    expect(cells.filter(c=>!c.corrected).every(c=>Math.abs(c.actual!-c.reference)<=1e-8*Math.max(1,Math.abs(c.reference)))).toBe(true)
   })
-  it('能写出并读回（文件未损坏）', () => {
-    const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
-    const back = XLSX.read(buf, { type: 'array' })
-    expect(back.SheetNames.length).toBe(wb.SheetNames.length)
-    expect(buf.byteLength).toBeGreaterThan(10000)
+  it('参考数据包含原始文件身份和六个完整角度组',()=>{
+    expect(courseReference.map(b=>b.sha256)).toEqual(['da3fd24dda889d8392c314d6e382cfb91761f86cde1694f214ca582517ecf1bf','196a4c488dbb7992469c9179922e64e45e33002b029e9012b490524a80414218'])
+    expect(courseReference[1].sheets.map(s=>s.name)).toEqual(['10','17','25','37','40','45','总厚度','总爆破压强'])
+  })
+  it('原表手选层数与小数估算分别保留',()=>{
+    const s=raw.Sheets['筒身强度设计与计算']
+    expect(s.B27.f).toBe('B20/C8');expect(s.B29.f).toBe('B24/C8')
+    expect(s.B27.v).toBeCloseTo(14.247551987639529,10)
+    expect(s.C27.v).toBe(14);expect(s.C29.v).toBe(24)
+  })
+  it('保留两种 π 写法，局部余弦项采用平方',()=>{
+    expect(raw.Sheets['筒身强度设计与计算'].I3.f).toBe('H3/180*3.1415926')
+    const g=raw.Sheets['封头-10°']
+    expect(g.G3.f).toBe('F3/180*PI()');expect(g.L3.f).toBe('2*3.1415926*C3/C13*H3')
+    expect(g.L23.f).toContain('COS(K23/180*PI())^2')
+    expect(g.L23.v).toBeCloseTo(.055914150152195294/.75,9)
+  })
+  it('恢复矩阵、逆矩阵和活系数，未用快照代替求解',()=>{
+    const s=raw.Sheets['封头-10°']
+    expect(s.F5.v).toBe(1);expect(s.I8.f).toContain('2/5*3.1415926')
+    expect(s.K7.f).toContain('L3*N3*O3/3.1415926')
+    expect(s.F11.f).toBe('INDEX(MINVERSE($F$5:$I$8),1,1)')
+    expect(s.G17.f).toBe('SUM(F11*K5,G11*K6,H11*K7,I11*K8)')
+    expect(s.G17.v).toBeCloseTo(-30.982067890136932,9)
+    expect(s.K8.v).toBeCloseTo(32264.720667658996,7)
+  })
+  it('原表 144 点完整保留，包括 45° 在 163 mm 处的人工分段',()=>{
+    expect(res.dome.profile).toHaveLength(144)
+    expect(res.dome.profile.slice(0,3).map(p=>p.r)).toEqual([30.2,32,33])
+    const g=raw.Sheets['封头-45°']
+    expect(g.N17.v).toBe(163);expect(g.E155.v).toBe(163)
+    expect(g.J155.v).toBeCloseTo(.8026657566009021,9)
+    expect(raw.Sheets['封头总厚度'].B134.v).toBeCloseTo(6.327747184325943,9)
+    expect(raw.Sheets['封头总爆破压强'].C134.v).toBeCloseTo(83.69683882583904,8)
   })
 })
 
-describe('筒身表：地址与公式与原表一致', () => {
-  const ws = wb.Sheets['筒身强度设计与计算']
-  it('参数区 C3=R、C8/C9 为派生公式', () => {
-    expect(ws['C3'].v).toBe(173.5)
-    expect(ws['C8'].f).toBe('C7/C6/C4')
-    expect(ws['C9'].f).toBe('C8/C5')
-    expect(ws['C10'].v).toBe(90)
-    expect(ws['C11'].v).toBe(3385)
-    expect(ws['C13'].f).toBe('C4*C12')
-    expect(ws['C15'].f).toBe('C11*C5')
+describe('实际导出文件',()=>{
+  it('公开计算书逐角度齐全，仅包含计算结果与公式',async()=>{
+    const bytes=await workbookBytes(input,res),book=new ExcelJS.Workbook()
+    await book.xlsx.load(bytes as never)
+    expect(book.worksheets).toHaveLength(14)
+    expect(book.getWorksheet('说明')).toBeUndefined()
+    expect(book.worksheets.every(s=>s.state==='visible')).toBe(true)
+    expect(book.worksheets.filter(s=>s.name.startsWith('封头-')).map(s=>s.name)).toEqual(['封头-10°','封头-17°','封头-25°','封头-37°','封头-40°','封头-45°'])
+    const saved=XLSX.read(bytes,{type:'array'})
+    expect(saved.SheetNames).not.toContain('原版对比')
+    expect(saved.Sheets['方案汇总'].B8.v).toBeCloseTo(102.09988121282991,9)
+    expect(saved.Sheets['方案汇总'].B9.v).toBeCloseTo(95.60087591615947,9)
+    expect(saved.Sheets['方案汇总'].B10.v).toBeCloseTo(76.57491090962243,9)
+    expect(saved.Sheets['方案汇总'].B11.v).toBeCloseTo(.055914150152195294,9)
+    expect(saved.Sheets['封头总厚度'].A148.v).toBe(173.5)
+    expect(saved.Sheets['封头总爆破压强'].C148.v).toBeCloseTo(79.38986572678792,9)
+    for(const n of saved.SheetNames)for(const [a,c]of Object.entries(saved.Sheets[n])){
+      expect(c.t,`${n}!${a}`).not.toBe('e')
+      if(c.t==='s')expect(String(c.v)).not.toMatch(/一组一行|先看|再看|阅读顺序|取消隐藏|教你|原版|原表|修正|差异对比|核对通过/)
+    }
+    const angle=book.getWorksheet('封头-10°')!
+    expect(angle.getCell('A2').value).toBe('10° 螺旋铺层校验')
+    expect(angle.getCell('A30').formula).toBe('INDEX(MINVERSE($A$23:$D$26),1,1)')
+    expect(angle.getCell('G30').formula).toBe('SUM(A30*E23,B30*E24,C30*E25,D30*E26)')
+    expect(angle.getCell('H41').formula).toContain('COS(G41/180*PI())^2')
+    expect(angle.views[0].showGridLines).toBe(true)
+    expect(angle.pageSetup.printTitlesRow).toBe('40:40')
+    expect(angle.getCell('C6').fill).toMatchObject({fgColor:{argb:'FFF3D4'}})
+    expect(book.getWorksheet('公式说明')!.getImages()).toHaveLength(FORMULAS.length)
+    const zip=XLSX.CFB.read(bytes,{type:'array'})
+    const charts=zip.FullPaths.filter((p:string)=>/charts\/chart\d+\.xml$/.test(p))
+    expect(charts).toHaveLength(3)
+    const xml=charts.map((p:string)=>new TextDecoder().decode(XLSX.CFB.find(zip,p)!.content as Uint8Array)).join('')
+    expect(xml).toContain('<c:barChart>');expect(xml).toContain('<c:scatterChart>');expect(xml).not.toContain('externalData');expect(xml).not.toContain('<c:smooth val="1"')
   })
-  it('角度块 6 行 + 环向行，层数与铺层表一致', () => {
-    expect(ws['H3'].v).toBe(10)
-    expect(ws['L3'].v).toBe(4)
-    expect(ws['H8'].v).toBe(45)
-    expect(ws['L8'].v).toBe(2)
-    expect(ws['J3'].f).toBe('COS(I3)*COS(I3)')
+  it('数学表达式与网站一致，图片可离线读取',()=>{
+    expect(images.map(i=>i.tex)).toEqual(FORMULAS.map(i=>i.formula))
+    for(const i of images)expect(Buffer.from(i.base64,'base64').subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a')
   })
-  it('合计 pα / pθ 用 SUM 公式跨行累加', () => {
-    // 与原表同行号：合计在 I26/J26，厚度在 I30/J30/K30
-    expect(ws['I26']?.f).toBe('SUM(K12:K17)')
-    expect(ws['J26']?.f).toBe('SUM(L12:L17,L22)')
-    expect(ws['I30']?.f).toBe('SUM(L3:L8)*C9')
-    expect(ws['K30']?.f).toBe('I30+J30')
-  })
-  it('初估块用 ROUNDUP（软件规则，原表是手工取整）', () => {
-    expect(ws['B20']?.f).toBe('(C3*C10)/(2*C11*B17*B17)')
-    expect(ws['B24']?.f).toBe('(2-B18*B18)*C3*C10/(2*C11)')
-    expect(ws['B27']?.f).toBe('ROUNDUP(B20/C8,0)')
-  })
-})
-
-describe('封头表：样条、覆盖、口径开关', () => {
-  const ws = wb.Sheets['封头-10°']
-  it('极孔/带宽/mR 公式与参数区一致', () => {
-    expect(ws['I3'].f).toBe('SIN(G3)*$C$3')
-    expect(ws['J3'].f).toBe('I3+$C$13*2')
-    expect(ws['K3'].f).toBe('I3+$C$13')
-    expect(ws['L3'].f).toBe('2*PI()*C3/C13*H3')
-    expect(ws['P3'].f).toBe('2*N3*O3')
-  })
-  it('m1..m4 写的是 core 解出来的数值', () => {
-    expect(ws['G22'].v).toBeCloseTo(g10.m[0], 9)
-    expect(ws['G23'].v).toBeCloseTo(g10.m[1], 9)
-    expect(ws['G24'].v).toBeCloseTo(g10.m[2], 11)
-    expect(ws['G25'].v).toBeCloseTo(g10.m[3], 14)
-  })
-  it('体积守恒 V1/V2 与方程组右端项都在表里', () => {
-    expect(ws['N8'].f).toContain('ACOS(I3/K3)')
-    expect(ws['P8'].f).toContain('(J3^2-K3^2)')
-    expect(ws['L9'].f).toBe('N8+P8')
-    expect(ws['H20'].f).toBe('M9+O9')
-  })
-  it('样条/覆盖/守卫公式逐行带正确行号', () => {
-    expect(ws['E28'].v).toBeCloseTo(res.dome.rFirst + 0.072, 1)
-    expect(ws['F28'].f).toBe('$G$22+$G$23*E28+$G$24*E28^2+$G$25*E28^3')
-    expect(ws['G28'].f).toContain('ACOS($I$3/E28)')
-    expect(ws['H28'].f).toBe('IF(E28<$I$3,0,IF(E28<=$J$3,F28,G28))')
-    expect(ws['J28'].f).toBe('H28*$I$28')
-    expect(ws['I28'].v).toBe(g10.cycles)
-    expect(ws['L28'].f).toBe('IF(E28<$I$3,0,2*J28*$C$15/$C$3*COS(K28/180*PI())^2)')
-  })
-  it('切到「Excel 原样」时 L 列写回笔误式', () => {
-    const raw = buildWorkbook({ ...input, refMode: 'excel' }, runCheck({ ...input, refMode: 'excel' }))
-    const w2 = raw.Sheets['封头-10°']
-    expect(w2['L28'].f).toContain('COS(K28/180*PI()*COS(K28/180*PI()))')
-    expect(w2['H28'].f).toContain('MAX(0,')
-  })
-})
-
-describe('跨表汇总：行偏移必须对齐（最易错处）', () => {
-  const t = wb.Sheets['封头总厚度']
-  const p = wb.Sheets['封头总爆破压强']
-  it('r 取最低角 sheet 的 E 列，首行指向 E28', () => {
-    expect(t['A2'].f).toBe(`'封头-10°'!E28`)
-    expect(p['A2'].f).toBe(`'封头-10°'!E28`)
-  })
-  it('总厚度 = 六个 sheet 的 J 列同行相加', () => {
-    expect(t['B2'].f).toBe('SUM(D2:I2)')
-    expect(t['D2'].f).toBe(`'封头-10°'!J28`)
-    expect(t['I2'].f).toBe(`'封头-45°'!J28`)
-  })
-  it('总爆破压强 = L 列相加，再乘 ks', () => {
-    expect(p['D2'].f).toBe(`'封头-10°'!L28`)
-    expect(p['B2'].f).toBe('SUM(D2:I2)')
-    expect(p['C2'].f).toBe('B2*0.75')
-  })
-  it('末行落在 r=R（145 点网格：30.2 起步、逐 1 mm、末尾补 R），求和覆盖 D~I 六组', () => {
-    const last = Number(t['!ref']!.split(':')[1].replace(/\D/g, ''))
-    expect(last).toBe(146)
-    expect(t[`A${last}`]).toBeTruthy()
-    expect(t[`B${last}`].f).toBe(`SUM(D${last}:I${last})`)
-    // 末行 r 必须正好是 R：跨表行号对齐后，最后一行就是各 sheet 共用的 R 行
-    const dome = wb.Sheets['封头-10°']
-    const domeLast = Number(dome['!ref']!.split(':')[1].replace(/\D/g, ''))
-    expect(domeLast).toBe(last + 26)
-    expect(dome[`E${domeLast}`].v).toBe(173.5)
-  })
-})
-
-describe('汇总与说明页', () => {
-  it('汇总页写入了判定范围与所用算法（导出报告可追溯）', () => {
-    const s = wb.Sheets['方案汇总']
-    const cells = Object.keys(s)
-      .filter((k) => k.startsWith('B'))
-      .map((k) => String(s[k].v ?? ''))
-    expect(cells.some((c) => c.includes('所有角度都铺到的最小平行圆'))).toBe(true)
-    expect(cells.some((c) => c.includes('正确算法 cos²α'))).toBe(true)
-    expect(cells.some((c) => c.includes('待调整') || c.includes('满足'))).toBe(true)
-  })
-  it('说明页列出了与参考表的差异', () => {
-    const n = wb.Sheets['说明']
-    const txt = Object.keys(n)
-      .filter((k) => k.startsWith('B'))
-      .map((k) => String(n[k].v ?? ''))
-      .join(' ')
-    expect(txt).toContain('少一个右括号')
-    expect(txt).toContain('ROUNDUP')
-    expect(txt).toContain('活公式')
+  it('单角度、重复角度、停用组、十二个角度组可导出',async()=>{
+    for(const spiral of [[{angle:10,layers:4}],[{angle:10,layers:4},{angle:10,layers:2},{angle:40,layers:4,active:false}],Array.from({length:12},(_,i)=>({angle:10+i*3,layers:2}))]){
+      const data={...input,plan:{spiral,hoop:20}},result=runCheck(data),book=new ExcelJS.Workbook()
+      await book.xlsx.load(await workbookBytes(data,result) as never)
+      expect(book.worksheets.filter(s=>s.name.startsWith('封头-'))).toHaveLength(result.dome.groups.length)
+      expect(book.getWorksheet('方案汇总')!.getCell('B16').result).toBeGreaterThan(0)
+      expect(book.getWorksheet('原版对比')).toBeUndefined()
+    }
+  },15000)
+  it('没有螺旋组时明确报错',async()=>{
+    const data={...input,plan:{spiral:[],hoop:20}}
+    await expect(workbookBytes(data,runCheck(data))).rejects.toThrow('没有可用的螺旋角度组')
   })
 })
