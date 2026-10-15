@@ -1,27 +1,40 @@
 {
   "name": "vessel-layup-designer",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
+  "main": "desktop/main.cjs",
   "description": "复合材料气瓶缠绕铺层设计软件 — 网格理论筒身设计 + 封头缠绕规律校核，纯前端单文件可分发",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:single": "tsc --noEmit && SINGLE_FILE=1 vite build",
+    "build:single": "tsc --noEmit && node tools/build-single.mjs",
+    "desktop": "node node_modules/electron/install.js && npm run build:single && electron .",
+    "build:win": "node node_modules/electron/install.js && npm run build:single && electron-builder --config desktop/builder.json --win --x64",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:version": "node tools/verify-version-release.mjs"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "xlsx": "0.18.5"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "playwright-core": "^1.64.1",
     "typescript": "~5.9.3",
     "vite": "^7.3.7",
     "vite-plugin-singlefile": "^2.3.3",
