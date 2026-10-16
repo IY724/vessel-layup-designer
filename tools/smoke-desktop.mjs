@@ -40,7 +40,7 @@ try {
   assert.equal(workbook.worksheets.length, 14)
   assert.ok(workbook.worksheets.every((sheet) => sheet.state === 'visible'))
   assert.equal(workbook.getWorksheet('公式说明').getImages().length, 17)
-  assert.ok(Math.abs(workbook.getWorksheet('筒身强度设计与计算').getCell('G29').result - 102.09988121282991) < 1e-8)
+  assert.ok(Math.abs(workbook.getWorksheet('筒身强度设计与计算').getCell('H29').result - 102.09988121282991) < 1e-8)
   await page.screenshot({ path: path.join(out, 'desktop.png') })
   await page.getByRole('button', { name: '校核明细', exact: true }).click()
   await page.locator('.modal').waitFor()

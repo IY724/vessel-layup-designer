@@ -9,7 +9,8 @@ import { extractFile } from '@electron/asar'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const deliver = path.resolve(root, '../交付')
-const out = path.resolve(root, '../_版本统一_20261015')
+const releaseDirectory = path.resolve(root, process.argv[2] ?? 'release')
+const out = path.resolve(root, process.argv[3] ?? '../_版本统一_20261015')
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex')
 
 const checks = []
@@ -58,21 +59,21 @@ await step('页面 SHA-256', () => htmlSha)
 const artifacts = ['安装包', '免安装'].map((kind) => `气瓶铺层设计-${label}-Windows-x64-${kind}.exe`)
 await step('安装包产物齐备', async () => {
   for (const name of artifacts) {
-    assert.ok((await fs.stat(path.join(root, 'release', name))).isFile(), `缺少 release/${name}`)
+    assert.ok((await fs.stat(path.join(releaseDirectory, name))).isFile(), `缺少构建产物：${name}`)
     assert.ok((await fs.stat(path.join(deliver, name))).isFile(), `缺少 交付/${name}`)
-    assert.ok((await fs.stat(path.join(root, 'release', name))).size > 1e8, `${name} 体积异常，可能只是便携版外壳`)
+    assert.ok((await fs.stat(path.join(releaseDirectory, name))).size > 1e8, `${name} 体积异常，可能只是便携版外壳`)
   }
   return artifacts
 })
 await step('无旧版本产物残留', async () => {
-  for (const dir of [path.join(root, 'release'), deliver]) {
+  for (const dir of [releaseDirectory, deliver]) {
     const stale = (await fs.readdir(dir)).filter((name) => /气瓶铺层设计-1\.(?!0-)|V1\.[1-9]/.test(name))
     assert.deepEqual(stale, [], `${path.relative(root, dir)} 残留旧版本文件：${stale.join('、')}`)
   }
 })
 
 // 6. 四处页面身份必须逐字节一致：构建页 = 桌面包内页 = 交付网页 = 站点内嵌页
-const asar = path.join(root, 'release/win-unpacked/resources/app.asar')
+const asar = path.join(releaseDirectory, 'win-unpacked/resources/app.asar')
 await step('桌面包内页面一致', () => assert.equal(sha(extractFile(asar, 'dist/index.html')), htmlSha))
 await step('桌面包内版本源一致', () => {
   const packaged = JSON.parse(extractFile(asar, 'package.json').toString())

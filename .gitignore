@@ -9,3 +9,6 @@ release
 .playwright-cli/
 output/
 *.qoder.site
+
+# 打包输出目录（带日期后缀），不进仓库
+release_*

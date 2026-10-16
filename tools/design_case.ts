@@ -16,7 +16,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defaultInput } from '../src/core/presets'
+import { defaultInput, courseInput } from '../src/core/presets'
 import { runCheck } from '../src/core/checker'
 import { autoDesign } from '../src/core/designer'
 import { domeAt } from '../src/core/dome'
@@ -48,6 +48,7 @@ const designInput: DesignInput = {
 // ── ④ 课件参考铺层（与原表同一铺层，逐格对账用） ───────────────────────────
 const refInput: DesignInput = {
   ...designInput,
+  constraint: courseInput().constraint,
   plan: {
     spiral: [
       { angle: 10, layers: 4 },
