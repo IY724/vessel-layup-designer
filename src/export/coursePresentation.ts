@@ -254,7 +254,7 @@ function lineTypeSheet(ws:Sheet,data:DesignInput,res:CheckResult):number{
     ['筒身转角','γ',live('B10*TAN(C15/180*PI())/(2*PI()*B7)*360',turns.gamma),'°'],
     ['封头转角','β',live('2*(90+ASIN((B7/B8*TAN(C15/180*PI())-B9)/B7)/PI()*180)',turns.beta),'°'],
     ['单程转角','θt',live('C16+C17',turns.oneWay),'°'],
-    ['双程转角','θn',live('2*C18',turns.roundTrip),'°'],
+    ['芯模转角','θn',live('2*C18',turns.roundTrip),'°'],
   ])
   section(ws,21,'候选方案','A','G')
   const list=candidates.length?candidates.map(c=>[

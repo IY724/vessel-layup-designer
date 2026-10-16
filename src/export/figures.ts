@@ -118,7 +118,7 @@ export async function lineTypeFigure(input: DesignInput, result: CheckResult, W 
   el.push(`<line x1="${ml}" y1="${mt}" x2="${ml}" y2="${H - mb}" stroke="#cbd5e1"/>`)
   el.push(`<line x1="${ml}" y1="${H - mb}" x2="${W - mr}" y2="${H - mb}" stroke="#cbd5e1"/>`)
   el.push(`<text x="${W - mr}" y="${H - mb + 28}" font-size="10" fill="#64748b" text-anchor="end">外径 D (mm)</text>`)
-  el.push(`<text x="${ml - 46}" y="${mt + 2}" font-size="10" fill="#64748b">双程转角 Φ</text>`)
+  el.push(`<text x="${ml - 46}" y="${mt + 2}" font-size="10" fill="#64748b">芯模转角 θ′n</text>`)
   for (const c of candidates) {
     const near = Math.abs(c.D - currentD) < 1.5
     el.push(

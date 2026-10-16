@@ -92,7 +92,7 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
   return (
     <div className="dome">
       <div className="pane">
-        <h4>Φ = f(D) 设计曲线</h4>
+        <h4>芯模转角 θ′n = f(D) 设计曲线</h4>
         <svg className="viz" viewBox={`0 0 ${W} ${H}`}>
           {/* 坐标网格 */}
           {thetaTicks.map((t, i) => (
@@ -118,7 +118,7 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
             外径 D (mm)
           </text>
           <text x={ml - 40} y={mt + 2} fontSize="9" fill="#64748b">
-            双程转角 Φ
+            芯模转角 θ′n
           </text>
 
           {/* 允许转角水平线 + 标签 */}
@@ -201,7 +201,7 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
                   <td className="angle">{f(c.theta, 0)}°</td>
                   <td>{f(c.D, 1)}</td>
                   <td>{f(c.l, 1)}</td>
-                  <td>{f(c.ratio, 2)}</td>
+                  <td className={c.ratio < 2 || c.ratio > 5 ? 'oob' : undefined}>{f(c.ratio, 2)}</td>
                   <td>{c.n}</td>
                   <td>
                     {c.K},{c.m}

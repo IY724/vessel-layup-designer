@@ -157,6 +157,7 @@ table.grid tr.sub td { background: #eef1f4; font-weight: 600; }
 table.grid tr.total td { background: #dfe6ed; font-weight: 700; border-top: 1px solid var(--line); }
 table.grid td.angle { font-weight: 600; }
 table.grid td.bad { color: var(--bad); font-weight: 700; }
+table.grid td.oob { background: #fdf8ec; color: #b45309; font-weight: 600; }
 table.grid td.ok { color: var(--ok); }
 
 /* 铺层表：拖动排序 / 激活开关 / 非激活灰显 */

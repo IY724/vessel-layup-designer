@@ -85,6 +85,15 @@ try {
   assert.match(helpText, /23°/)
   assert.match(helpText, /极孔缠绕角 \+ 10°/)
   await page.locator('.modal').getByRole('button', { name: '关闭', exact: true }).click()
+  // 线型切点：长径比超经验区间标黄 + 线型表进弹窗
+  const lineCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: /线型切点设计/ }) })
+  assert.ok((await lineCard.locator('td.oob').count()) >= 1, '超经验区间的长径比未标色')
+  await page.locator('button.help-dot[title="缠绕线型公式"]').click()
+  const lineHelp = await page.locator('.modal').innerText()
+  assert.match(lineHelp, /线型表档位/)
+  assert.match(lineHelp, /切点数/)
+  assert.match(lineHelp, /长径比经验区间/)
+  await page.locator('.modal').getByRole('button', { name: '关闭', exact: true }).click()
   assert.equal(await page.getByRole('button', { name: /上移|下移/ }).count(), 0)
   assert.equal(await page.getByText('分段取值', { exact: true }).count(), 0)
   assert.equal(await page.getByText('局部曲线最低值', { exact: true }).count(), 0)
@@ -208,6 +217,7 @@ try {
   report.checks.push('生成后角度按整度四舍五入并实际计算')
   report.checks.push('封头厚度分布与爆压分布可切换，厚度读数含总厚与筒身参考')
   report.checks.push('初估角说明弹窗含经验取法 23°/极孔角+10°')
+  report.checks.push('长径比超经验区间标黄，线型表进线型弹窗')
   await writeFile(path.join(out, 'verification.json'), JSON.stringify(report, null, 2))
   console.log(JSON.stringify({ target: report.target, passed: report.checks.length, rendererErrors: failures, report: path.join(out, 'verification.json') }))
 } catch (error) {

@@ -456,11 +456,11 @@ export function intersectLineTypes(base: DesignBase, volumeL: number, allowed: L
 /** 常用区间提示（只给判据，来源标注见 docs/DESIGN.md） */
 export function geometryChecks(p: VolumeParams): Array<{ level: 'ok' | 'warn'; text: string }> {
   const out: Array<{ level: 'ok' | 'warn'; text: string }> = []
-  const L = 2 * (p.R_in + p.l + 2 * (p.R_in / p.lambda))
+  const L = p.l + 2 * (p.R_in / p.lambda)
   const ratio = p.l / (2 * p.R_in)
   out.push({
     level: ratio > 0 && (ratio < 2 || ratio > 5) ? 'warn' : 'ok',
-    text: `筒身长径比 l/D = ${ratio.toFixed(2)}，常用 2~5；总长≈${L.toFixed(0)} mm`,
+    text: `筒身长径比 l/D = ${ratio.toFixed(2)}，常用 2~5；总长≈${L.toFixed(0)} mm（不含瓶口）`,
   })
   out.push({
     level: p.lambda > 2.5 ? 'warn' : 'ok',
