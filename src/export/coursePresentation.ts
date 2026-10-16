@@ -4,7 +4,7 @@ import type { CheckResult, DesignInput } from '../core/types'
 import { activeGroups, layupGroups } from '../core/layup'
 import { initialDesign } from '../core/initialDesign'
 import { expansionAngles } from '../core/expansion'
-import { allowedLineTypes, computeVolume, intersectLineTypes, lambdaFromDepth, windingTurns, type VolumeParams } from '../core/geometry'
+import { allowedLineTypes, computeVolume, intersectLineTypes, lambdaFromDepth, lineTypeGrid, windingTurns, type VolumeParams } from '../core/geometry'
 import images from './formulaImages.json'
 import { addNativeCharts, type NativeChart } from './nativeCharts'
 import { domeContourFigure, lineTypeFigure } from './figures'
@@ -264,7 +264,27 @@ function lineTypeSheet(ws:Sheet,data:DesignInput,res:CheckResult):number{
   const noteRow=23+list.length
   text(ws,`A${noteRow}:G${noteRow}`,'θ = 360°·(m + K/n)：n 为切点数，K、m 为整数（K 与 n 互质）。',10)
   const imgRow=noteRow+2
-  ws.pageSetup.printArea=`A1:H${imgRow+24}`
+  // 线型表（表2-1 样式）：n=1~5 × N=0~5 全档位；浅蓝=软件允许窗口，黄=当前采用档位
+  const grid=lineTypeGrid(5,6)
+  const ltTop=imgRow+13
+  section(ws,ltTop,'纤维缠绕线型表','A','H')
+  rows(ws,ltTop+1,[
+    ['切点数 n','K',...Array.from({length:6},(_v,i)=>`N=${i}`)],
+    ...grid.map(g=>[g.n,g.K,...g.cells.map(c=>`${c.theta}°\n${c.frac}`)]),
+  ])
+  const allowedThetas=new Set(allowedLineTypes(450,660,4).map(r=>r.theta))
+  const adopted=candidates.find(c=>Math.abs(c.D-currentD)<1.5)
+  grid.forEach((g,ri)=>{
+    for(let N=0;N<6;N++){
+      const cell=ws.getCell(ltTop+2+ri,3+N)
+      if(g.n<=4&&allowedThetas.has(g.cells[N].theta))cell.fill=fill(C.calc)
+      if(adopted&&adopted.n===g.n&&adopted.K===g.K&&adopted.m===N)cell.fill=fill(C.input)
+    }
+    ws.getRow(ltTop+2+ri).height=30
+  })
+  const legendRow=ltTop+2+grid.length
+  text(ws,`A${legendRow}:H${legendRow}`,'浅蓝：软件允许窗口（n ≤ 4、450°~660°）；黄：当前采用档位。',10)
+  ws.pageSetup.printArea=`A1:H${legendRow+1}`
   return imgRow
 }
 

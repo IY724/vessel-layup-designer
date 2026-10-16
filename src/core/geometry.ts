@@ -242,6 +242,22 @@ export function lineTypeTable(maxN = 6, maxM = 6): LineTypeRow[] {
   return rows.sort((a, b) => a.theta - b.theta)
 }
 
+/** 线型表矩阵（表2-1 样式）：按切点数 n、分子 K 分行，N=0.. 各列给 θ=360°(N+K/n) 与角分数 */
+export function lineTypeGrid(maxN = 5, cols = 6) {
+  const out: Array<{ n: number; K: number; cells: Array<{ theta: number; frac: string }> }> = []
+  for (let n = 1; n <= maxN; n++) {
+    for (let K = 1; K <= n; K++) {
+      if (gcd(K, n) !== 1) continue
+      out.push({
+        n,
+        K,
+        cells: Array.from({ length: cols }, (_, N) => ({ theta: 360 * (N + K / n), frac: `${N * n + K}/${n}` })),
+      })
+    }
+  }
+  return out
+}
+
 /**
  * 单程/双程转角（郑强式2-4）：
  *   α₀ = arcsin(r₀/R)  —— 筒身处缠绕角（=极孔切线角）

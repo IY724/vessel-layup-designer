@@ -17,13 +17,14 @@ export interface FormulaItem {
 
 export function FormulaHelp(props: { title: string; items: FormulaItem[] }) {
   const [open, setOpen] = useState(false)
+  const wide = props.items.some((it) => it.table && it.table.head.length > 4)
   return (
     <>
       <button className="help-dot" title={props.title} onClick={() => setOpen(true)}>
         ?
       </button>
       {open && (
-        <Modal title={props.title} narrow onClose={() => setOpen(false)}>
+        <Modal title={props.title} narrow={!wide} wide={wide} onClose={() => setOpen(false)}>
           <div className="formula-list">
             {props.items.map((it, i) => (
               <div key={i}>
@@ -47,7 +48,7 @@ export function FormulaHelp(props: { title: string; items: FormulaItem[] }) {
                       {it.table.rows.map((row, ri) => (
                         <tr key={ri}>
                           {row.map((v, ci) => (
-                            <td key={ci}>{v}</td>
+                            <td key={ci}>{String(v).split('\n').map((seg, si) => (si ? <span key={si}><br />{seg}</span> : seg))}</td>
                           ))}
                         </tr>
                       ))}

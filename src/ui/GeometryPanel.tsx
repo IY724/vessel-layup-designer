@@ -16,7 +16,7 @@ import {
   computeVolume,
   geometryChecks,
   lambdaFromDepth,
-  lineTypeTable,
+  lineTypeGrid,
   solveGeometry,
   windingTurns,
   type UnknownField,
@@ -69,7 +69,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
   const vol = computeVolume(vp)
   const turns = useMemo(() => windingTurns(vp), [vp])
   const hints = useMemo(() => geometryChecks(vp), [vp])
-  const grades = useMemo(() => lineTypeTable(4).filter((r) => r.theta >= 450 && r.theta <= 660), [])
+  const grades = useMemo(() => lineTypeGrid(5, 6), [])
 
   const set = (patch: Partial<VolumeParams>) => setVp((s) => ({ ...s, ...patch }))
 
@@ -161,8 +161,8 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
                 { frm: '\\beta=2\\left(90+\\arcsin\\dfrac{h\\,\\tan\\alpha_0-r_0}{R_{in}}\\right)', desc: 'h 为封头深度，即 R_in ÷ λ' },
                 { frm: '\\theta_t=\\gamma+\\beta,\\quad \\theta_n=2\\,\\theta_t', desc: 'θ_t 为单程转角；θ_n 为芯模转角（往返一次）' },
                 { frm: '\\theta=360^\\circ\\left(m+\\dfrac{K}{n}\\right)', desc: 'n 为切点数，K、m 为整数（K 与 n 互质）' },
-                { note: '线型表档位（当前允许范围 n ≤ 4、450°~660°）：' },
-                { table: { head: ['转角 θ_n / °', '切点数 n', 'K', 'm'], rows: grades.map((r) => [r.theta, r.n, r.K, r.m]) } },
+                { note: '线型表（θ = 360°·(N + K/n)，N 为整圈数）：' },
+                { table: { head: ['切点数 n', 'K', 'N=0', 'N=1', 'N=2', 'N=3', 'N=4', 'N=5'], rows: grades.map((g) => [g.n, g.K, ...g.cells.map((c) => `${c.theta}°\n${c.frac}`)]) } },
                 { note: '长径比经验区间 2~5 用于初选外形；超区间的候选仍列出，在候选表中标黄。' },
               ]}
             />
