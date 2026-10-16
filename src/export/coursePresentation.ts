@@ -4,14 +4,19 @@ import type { CheckResult, DesignInput } from '../core/types'
 import { activeGroups, layupGroups } from '../core/layup'
 import { initialDesign } from '../core/initialDesign'
 import { expansionAngles } from '../core/expansion'
-import { allowedLineTypes, computeVolume, intersectLineTypes, lambdaFromDepth, lineTypeGrid, windingTurns, type VolumeParams } from '../core/geometry'
+import { allowedLineTypes, computeVolume, intersectLineTypes, lambdaFromDepth, windingTurns, type VolumeParams } from '../core/geometry'
 import images from './formulaImages.json'
+import linetableRef from '../assets/linetableRef.json'
 import { addNativeCharts, type NativeChart } from './nativeCharts'
 import { domeContourFigure, lineTypeFigure } from './figures'
 
 type Sheet = ExcelJS.Worksheet
 type AddressMap = Record<string,string>
 const C={ink:'24384C',muted:'65768A',blue:'335E87',pale:'F3F6FA',line:'DCE3EB',input:'FFF3D4',calc:'EDF3FA',red:'FCEAEA',white:'FFFFFF'}
+// 表2-1 原表插图：切线图（显示高 380px≈11.4 行）下方 12 行起，显示宽 520px，高度按原图比例
+const LT_IMG={top:12,width:520}
+const LT_IMG_HEIGHT=Math.round((LT_IMG.width*linetableRef.height)/linetableRef.width)
+const LT_IMG_ROWS=Math.ceil(LT_IMG_HEIGHT/33)
 const fill=(color:string):ExcelJS.Fill=>({type:'pattern',pattern:'solid',fgColor:{argb:color}})
 const live=(formula:string,result:number|string):ExcelJS.CellFormulaValue=>({formula,result})
 const col=(n:number)=>utils.encode_col(n-1)
@@ -264,27 +269,13 @@ function lineTypeSheet(ws:Sheet,data:DesignInput,res:CheckResult):number{
   const noteRow=23+list.length
   text(ws,`A${noteRow}:G${noteRow}`,'θ = 360°·(m + K/n)：n 为切点数，K、m 为整数（K 与 n 互质）。',10)
   const imgRow=noteRow+2
-  // 线型表（表2-1 样式）：n=1~5 × N=0~5 全档位；浅蓝=软件允许窗口，黄=当前采用档位
-  const grid=lineTypeGrid(5,6)
-  const ltTop=imgRow+13
-  section(ws,ltTop,'纤维缠绕线型表','A','H')
-  rows(ws,ltTop+1,[
-    ['切点数 n','K',...Array.from({length:6},(_v,i)=>`N=${i}`)],
-    ...grid.map(g=>[g.n,g.K,...g.cells.map(c=>`${c.theta}°\n${c.frac}`)]),
-  ])
-  const allowedThetas=new Set(allowedLineTypes(450,660,4).map(r=>r.theta))
-  const adopted=candidates.find(c=>Math.abs(c.D-currentD)<1.5)
-  grid.forEach((g,ri)=>{
-    for(let N=0;N<6;N++){
-      const cell=ws.getCell(ltTop+2+ri,3+N)
-      if(g.n<=4&&allowedThetas.has(g.cells[N].theta))cell.fill=fill(C.calc)
-      if(adopted&&adopted.n===g.n&&adopted.K===g.K&&adopted.m===N)cell.fill=fill(C.input)
-    }
-    ws.getRow(ltTop+2+ri).height=30
-  })
-  const legendRow=ltTop+2+grid.length
-  text(ws,`A${legendRow}:H${legendRow}`,'浅蓝：软件允许窗口（n ≤ 4、450°~660°）；黄：当前采用档位。',10)
-  ws.pageSetup.printArea=`A1:H${legendRow+1}`
+  // 表2-1 纤维缠绕线型表：原表插图（郑强 2008 p14，含切点数纵向合并与各格斜线），
+  // 与界面弹窗共用同一张图；图体在 writePresentation 中嵌入，此处只留表下注与打印区域。
+  // 插图整张放在新的一页，避免打印/导出 PDF 时被分页切断。
+  ws.getRow(imgRow+LT_IMG.top-1).addPageBreak()
+  const ltNoteRow=imgRow+LT_IMG.top+LT_IMG_ROWS+1
+  text(ws,`A${ltNoteRow}:H${ltNoteRow}`,'注：n ≤ 4、450°~660° 为软件初选窗口；长径比经验区间 2~5（朱宁 2023）用于初选外形；线型表出自郑强（2008）。',10)
+  ws.pageSetup.printArea=`A1:H${ltNoteRow+1}`
   return imgRow
 }
 
@@ -370,6 +361,9 @@ export async function writePresentation(source:WorkBook,data:DesignInput,res:Che
     putFigure('线型切点设计',lineFig.base64,lineFig.width/2,lineFig.height/2,{col:0,row:lineTypeImageRow-1})
     putFigure('封头总厚度',contourFig.base64,contourFig.width/2,contourFig.height/2,{col:3+res.dome.groups.length+1,row:3})
   }catch{}
+  // 表2-1 原表插图是静态资源，不依赖 DOM，Node 单测与浏览器导出都会带上
+  const ltImgId=wb.addImage({base64:linetableRef.base64,extension:'png'})
+  wb.getWorksheet('线型切点设计')!.addImage(ltImgId,{tl:{col:0,row:lineTypeImageRow+LT_IMG.top-1},ext:{width:LT_IMG.width,height:LT_IMG_HEIGHT}})
   const bytes=new Uint8Array(await wb.xlsx.writeBuffer()),zip=CFB.read(bytes,{type:'array'});addNativeCharts(zip,charts)
   return CFB.write(zip,{fileType:'zip',type:'array',compression:true}) as Uint8Array
 }

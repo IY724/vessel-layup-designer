@@ -246,6 +246,9 @@ svg.viz { width: 100%; height: auto; display: block; background: #fff; border: 1
 /* 数学式（MathML） */
 .tex math { font-size: 1.05em; line-height: 1.25; }
 .formula-list .frm .tex math { font-size: 1.4em; }
+
+/* 线型表原表插图（表 2-1，郑强 2008）：弹窗内等比缩放 */
+.formula-list .lt-ref-img { display: block; max-width: 100%; height: auto; margin: 2px 0; }
 .detail td .tex math { font-size: 1.15em; }
 
 /* ── 明细 ───────────────────────────────────────────────── */

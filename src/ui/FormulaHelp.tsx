@@ -1,5 +1,5 @@
 /** FormulaHelp.tsx — 公式问号：点击弹出渲染好的公式（只给公式与一句"算什么"，不给长文字解释） */
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Modal } from './Modal'
 import { sym } from './Sym'
 import { Tex } from './Tex'
@@ -11,13 +11,13 @@ export interface FormulaItem {
   note?: string
   /** 可选：一句"算什么"（文中变量用 `_` 写下标，如 R_in、σ_c） */
   desc?: string
-  /** 档位/清单类表格（如线型表），直接进弹窗 */
-  table?: { head: string[]; rows: Array<Array<string | number>> }
+  /** 自定义内容（如线型表原表插图），出现时弹窗自动加宽 */
+  custom?: ReactNode
 }
 
 export function FormulaHelp(props: { title: string; items: FormulaItem[] }) {
   const [open, setOpen] = useState(false)
-  const wide = props.items.some((it) => it.table && it.table.head.length > 4)
+  const wide = props.items.some((it) => it.custom)
   return (
     <>
       <button className="help-dot" title={props.title} onClick={() => setOpen(true)}>
@@ -35,26 +35,7 @@ export function FormulaHelp(props: { title: string; items: FormulaItem[] }) {
                 )}
                 {it.note && <div className="note">{sym(it.note)}</div>}
                 {it.desc && <div className="desc">{sym(it.desc)}</div>}
-                {it.table && (
-                  <table className="grid">
-                    <thead>
-                      <tr>
-                        {it.table.head.map((h) => (
-                          <th key={h}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {it.table.rows.map((row, ri) => (
-                        <tr key={ri}>
-                          {row.map((v, ci) => (
-                            <td key={ci}>{String(v).split('\n').map((seg, si) => (si ? <span key={si}><br />{seg}</span> : seg))}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                {it.custom}
               </div>
             ))}
           </div>

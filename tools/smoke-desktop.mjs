@@ -40,7 +40,7 @@ try {
   assert.equal(workbook.worksheets.length, 16)
   assert.ok(workbook.worksheets.every((sheet) => sheet.state === 'visible'))
   assert.equal(workbook.getWorksheet('公式说明').getImages().length, 17)
-  assert.ok(workbook.getWorksheet('线型切点设计').getImages().length >= 1, '切线图未嵌入')
+  assert.equal(workbook.getWorksheet('线型切点设计').getImages().length, 2, '切线图或表2-1原表插图未嵌入')
   assert.ok(workbook.getWorksheet('封头总厚度').getImages().length >= 1, '封头厚度轮廓图未嵌入')
   assert.ok(Math.abs(workbook.getWorksheet('筒身强度设计与计算').getCell('H29').result - 102.09988121282991) < 1e-8)
   await page.screenshot({ path: path.join(out, 'desktop.png') })

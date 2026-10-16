@@ -131,9 +131,11 @@ describe('实际导出文件',()=>{
     const cands=expansionAngles(input.geometry.R,res.derived.r0,res.derived.bandTotal)
     expect(calc.getCell('B31').result as number).toBeCloseTo(cands[0].diameter,9)
     expect(calc.getCell('C31').result as number).toBeCloseTo(cands[0].angle,9)
-    expect(line.getCell('A43').value).toBe('纤维缠绕线型表')
-    expect(line.getCell('D50').value).toBe('630°\n7/4')
-    expect(line.getCell('D49').fill).toMatchObject({fgColor:{argb:'EDF3FA'}})
+    // 表2-1 原表插图：静态 PNG，Node 与浏览器导出都应带上（Node 下切线图为 SVG 栅格化，跳过）
+    expect(line.getImages()).toHaveLength(1)
+    let hasNote=false
+    line.eachRow((row)=>row.eachCell((cell)=>{if(typeof cell.value==='string'&&cell.value.includes('长径比经验区间'))hasNote=true}))
+    expect(hasNote).toBe(true)
   })
   it('单角度、重复角度、停用组、十二个角度组可导出',async()=>{
     for(const spiral of [[{angle:10,layers:4}],[{angle:10,layers:4},{angle:10,layers:2},{angle:40,layers:4,active:false}],Array.from({length:12},(_,i)=>({angle:10+i*3,layers:2}))]){
