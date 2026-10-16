@@ -78,7 +78,6 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
         <h3>
           ① 容积与尺寸互算
           <span className="tail">
-            {sym('目标容积 V 是硬约束 · 可反推 l、R_in、λ')}
             <FormulaHelp
               title="容积与尺寸互算 · 公式"
               items={[
@@ -152,7 +151,6 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
         <h3>
           ② 线型切点设计
           <span className="tail">
-            由容积导出 Φ = f(D) 曲线 · 与线型表求交 · 用户自选
             <FormulaHelp
               title="缠绕线型公式"
               items={[
@@ -166,7 +164,7 @@ export function GeometryPanel({ input, result }: { input: DesignInput; result: C
           </span>
         </h3>
         <div className="hint" style={{ marginBottom: 0 }}>
-          当前几何（正算口径）：极孔缠绕角 {sym('α_0')} = <b>{f(turns.alpha0Deg, 3)}°</b>　筒身转角 γ ={' '}
+          当前几何：极孔缠绕角 {sym('α_0')} = <b>{f(turns.alpha0Deg, 3)}°</b>　筒身转角 γ ={' '}
           <b>{f(turns.gamma)}</b>°　封头转角 β = <b>{f(turns.beta)}</b>°　{sym('单程 θ_t')} = <b>{f(turns.oneWay)}</b>°　
           {sym('双程 θ_n')} = <b>{f(turns.roundTrip)}</b>°
         </div>

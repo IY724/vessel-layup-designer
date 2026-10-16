@@ -93,9 +93,6 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
     <div className="dome">
       <div className="pane">
         <h4>Φ = f(D) 设计曲线</h4>
-        <div className="sub">
-          守住容积 V = {f(volumeL, 2)} L：每个外径 D 唯一对应一个筒身长 l，也就唯一对应一个双程转角 Φ（= θ_n）。
-        </div>
         <svg className="viz" viewBox={`0 0 ${W} ${H}`}>
           {/* 坐标网格 */}
           {thetaTicks.map((t, i) => (
@@ -173,14 +170,11 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
             </text>
           )}
         </svg>
-        <div className="hint" style={{ marginTop: 6 }}>
-          曲线把"几何"和"线型"锁成一体：水平线与曲线的每个交点，就是一套（外径 D + 筒身长 l + 切点数 n）。
-        </div>
       </div>
 
       <div className="pane">
         <h4>候选方案（交点）</h4>
-        <div className="sub">软件不裁决：只列各档的 D、l、长径比与切点数，选哪档由你照表自己定。</div>
+        <div className="sub">选好档位点「采用」回填 D 与 l。</div>
         <div className="tablewrap" style={{ maxHeight: 250 }}>
           <table className="grid">
             <thead>
@@ -227,7 +221,7 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
           </table>
         </div>
         <div className="hint" style={{ marginTop: 6 }}>
-          θ = 360°·(m + K/n)；一个交点同时定下内胆几何尺寸（D、l）与数控线型档位（切点数 n）。
+          θ = 360°·(m + K/n)：n 为切点数，K、m 为整数（K 与 n 互质）。
         </div>
       </div>
     </div>
