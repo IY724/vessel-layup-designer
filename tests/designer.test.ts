@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { autoDesign, pickAlternate, planPressures } from '../src/core/designer'
 import { runCheck } from '../src/core/checker'
-import { defaultInput, courseInput } from '../src/core/presets'
+import { excelBaselineInput, courseInput } from '../src/core/presets'
 import { initialDesign, expandedLayerCounts, selectedLayerCount } from '../src/core/initialDesign'
 import { buildDomeGroup, domeAt, isDomeGroup } from '../src/core/dome'
 import { prepareExpansion } from '../src/core/expansion'
@@ -9,7 +9,7 @@ import { buildWorkbook, workbookBytes } from '../src/export/excel'
 import * as XLSX from 'xlsx'
 import { layupGroups, planFromRows } from '../src/core/layup'
 
-const base = defaultInput()
+const base = excelBaselineInput()
 const generate = (input = base) => {
   const out = autoDesign(input)
   if (!out.ok) throw new Error(out.reason)

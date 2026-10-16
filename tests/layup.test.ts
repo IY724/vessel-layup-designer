@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { expansionAngles, defaultAngles, prepareExpansion } from '../src/core/expansion'
 import { activeGroups, interleavePlan, layupGroups, planFromRows, transferHoop } from '../src/core/layup'
-import { defaultInput } from '../src/core/presets'
+import { excelBaselineInput } from '../src/core/presets'
 import { runCheck } from '../src/core/checker'
 import { autoDesign } from '../src/core/designer'
 import { workbookBytes } from '../src/export/excel'
@@ -21,7 +21,7 @@ describe('按课件直径步进扩孔', () => {
     expect(selected).not.toContain(90)
   })
   it('极孔和带宽变更后重算，强度变更保留用户勾选', () => {
-    const initial = prepareExpansion(defaultInput())
+    const initial = prepareExpansion(excelBaselineInput())
     const picked = { ...initial, constraint: { ...initial.constraint, candidates: [12, 55, 70] } }
     expect(prepareExpansion({ ...picked, strength: { ...picked.strength, kLoss: .8 } }).constraint.candidates).toEqual([12, 55, 70])
     const changed = prepareExpansion({ ...picked, geometry: { ...picked.geometry, R: 180 } })
@@ -32,7 +32,7 @@ describe('按课件直径步进扩孔', () => {
 })
 
 describe('统一螺旋/环向铺层顺序及类型计算', () => {
-  const input = defaultInput()
+  const input = excelBaselineInput()
   const rows = [
     { type: 'spiral' as const, angle: 10, layers: 4 },
     { type: 'hoop' as const, angle: 85, layers: 3 },

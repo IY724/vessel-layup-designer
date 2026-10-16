@@ -1,8 +1,11 @@
 /**
  * presets.ts — 默认模板（全部字段载入后仍可修改，软件不做任何用户改不了的隐藏假设）
  *
- * 只有一套模板，命名"默认"。它的数值取自本项目的基准算例（140 L / 35 MPa，见 tests/baseline.test.ts），
- * 这样"导出 Excel 计算书"与"校核明细"开箱即可与参考表逐格对账；换成自己的瓶子时把字段改掉即可。
+ * 只有一套界面模板，命名"默认"：初版设计算例（78 L / 70 MPa）的几何、工况与初始铺层，
+ * 开箱即可与设计资料逐项对账（核对基线见 tests/initialCase.test.ts）；换成自己的瓶子时
+ * 把字段改掉即可。
+ * 140 L / 35 MPa 基准案例保留为 excelBaselineInput()（与参考 Excel 逐格对账用，测试与
+ * 课程流程固定挂此案例），不再作为界面默认。
  * 来源标注（讲义/论文/插件）只写在 docs 与代码注释里，界面一律不出现。
  */
 import type { DesignInput, MaterialInput, StrengthInput } from './types'
@@ -18,7 +21,7 @@ export const DEFAULT_MATERIAL: MaterialInput = {
   resinDensity: 1.2,
 }
 
-/** 默认强度（"直接给定"模式：纤维发挥强度 3385 MPa、复材层强度 2031 MPa） */
+/** 140 L 基准案例的强度（"直接给定"：发挥强度 3385、复材层 2031，与参考 Excel 一致） */
 export const DEFAULT_STRENGTH_B: StrengthInput = {
   mode: 'B',
   sigmaNOL: 2390,
@@ -28,11 +31,21 @@ export const DEFAULT_STRENGTH_B: StrengthInput = {
   sigmaCompositeDirect: 2031,
 }
 
-/** 常用候选螺旋角（度） */
+/** 默认模板强度（"直接给定"）：复材层强度 2080，发挥强度 = 2080 / Vf */
+export const INITIAL_STRENGTH_B: StrengthInput = {
+  mode: 'B',
+  sigmaNOL: 2390,
+  kLoss: 0.85,
+  sigmaSpiralDirect: 2080 / 0.6,
+  sigmaHoopDirect: 2080 / 0.6,
+  sigmaCompositeDirect: 2080,
+}
+
+/** 常用候选螺旋角（按 140 L 基准案例几何的扩孔步进生成） */
 export const CANDIDATE_ANGLES = defaultAngles(expansionAngles(173.5, 30.13, 20).map(r => r.angle))
 
-/** 铺层为空的输入（强度按 NOL 自算）：供测试与"从零开始"使用 */
-export function blankInput(): DesignInput {
+/** 140 L 基准案例（与参考 Excel 逐格对账；测试、课程流程固定使用） */
+export function excelBaselineInput(): DesignInput {
   return {
     geometry: {
       R: 173.5,
@@ -46,14 +59,7 @@ export function blankInput(): DesignInput {
       linerThickness: 0,
     },
     material: { ...DEFAULT_MATERIAL },
-    strength: {
-      mode: 'A',
-      sigmaNOL: 2390,
-      kLoss: 0.85,
-      sigmaSpiralDirect: 3385,
-      sigmaHoopDirect: 3385,
-      sigmaCompositeDirect: null,
-    },
+    strength: { ...DEFAULT_STRENGTH_B },
     requirement: {
       pbMode: 'direct',
       pb: 90,
@@ -85,14 +91,71 @@ export function blankInput(): DesignInput {
   }
 }
 
-/** 默认模板 = 基准算例的完整输入（强度直接给定，便于逐格对账） */
+/** 铺层为空的输入（强度按 NOL 自算）：供测试与"从零开始"使用 */
+export function blankInput(): DesignInput {
+  const data = excelBaselineInput()
+  return {
+    ...data,
+    strength: {
+      mode: 'A',
+      sigmaNOL: 2390,
+      kLoss: 0.85,
+      sigmaSpiralDirect: 3385,
+      sigmaHoopDirect: 3385,
+      sigmaCompositeDirect: null,
+    },
+  }
+}
+
+/** 默认模板 = 初版设计算例（78 L / 70 MPa）：几何、工况与初始铺层全量载入 */
 export function defaultInput(): DesignInput {
-  return { ...blankInput(), strength: { ...DEFAULT_STRENGTH_B } }
+  return {
+    geometry: {
+      R: 135,
+      poleMode: 'winding',
+      r0Winding: 36,
+      portInnerRadius: 16,
+      linerAtPole: 20,
+      headShortAxis: 67.5,
+      cylLength: 1282,
+      volumeL: 78,
+      linerThickness: 5,
+    },
+    material: { ...DEFAULT_MATERIAL },
+    strength: { ...INITIAL_STRENGTH_B },
+    requirement: {
+      pbMode: 'direct',
+      pb: 157.5,
+      workingPressure: 70,
+      safetyFactor: 2.25,
+      ks: 0.75,
+    },
+    constraint: {
+      manualSpiralEstimate: null,
+      manualHoopEstimate: null,
+      candidates: [15, 20, 25, 35, 40],
+      angleRule: 'manual',
+      candidateSource: 'expansion',
+      expansionGeometry: JSON.stringify([135, 36, 20]),
+      forceEvenSpiral: true,
+      alphaRef: 15,
+    },
+    plan: {
+      spiral: [
+        { angle: 15, layers: 8 },
+        { angle: 20, layers: 8 },
+        { angle: 25, layers: 4 },
+        { angle: 35, layers: 4 },
+        { angle: 40, layers: 4 },
+      ],
+      hoop: 36,
+    },
+  }
 }
 
 /** 原表固定案例：保留 C27=14、C29=24 的人工选层，供逐格核对使用。 */
 export function courseInput(): DesignInput {
-  const data = defaultInput()
+  const data = excelBaselineInput()
   return { ...data, constraint: { ...data.constraint, manualSpiralEstimate: 14, manualHoopEstimate: 24, preserveCourseSelections: true } }
 }
 
@@ -107,7 +170,7 @@ export interface Preset {
 export const DEFAULT_PRESET: Preset = {
   id: 'default',
   label: '默认',
-  note: '140 L / 35 MPa 级瓶子的常用初值：R=173.5 mm、24K×4 束、Vf 0.6、爆压 90 MPa、平衡系数 0.75',
+  note: '78 L / 70 MPa 级瓶子的常用初值：R=135 mm、24K×4 束、Vf 0.6、爆压 157.5 MPa、平衡系数 0.75',
   make: defaultInput,
 }
 
