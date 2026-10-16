@@ -73,9 +73,14 @@ export interface RequirementInput {
 }
 
 export interface ConstraintInput {
-  /** 原表 C27/C29 的手工选取层数；与 B27/B29 的小数估算量分开保留。 */
+  /** 扩孔候选已由用户勾选；旧输入没有此标识时，弹窗按当前几何重新生成。 */
+  candidateSource?: 'expansion'
+  expansionGeometry?: string
+  /** 仅保留原表C27/C29的历史人工记录；实际初算层数始终由参数计算。 */
   manualSpiralEstimate?: number | null
   manualHoopEstimate?: number | null
+  /** 仅用于固定课件对照案例，保留原表人工取用值，不影响设计计算。 */
+  preserveCourseSelections?: boolean
   /** 候选螺旋角集（度），可自由增删 */
   candidates: number[]
   /** 角度分配规则：alternate = 课件经验"隔一取一"；manual = 手动指定 */
@@ -97,7 +102,13 @@ export interface GroupSpec {
   active?: boolean
 }
 
+export interface LayupGroup extends GroupSpec {
+  type: 'spiral' | 'hoop'
+}
+
 export interface LayupPlan {
+  /** 新方案的唯一有序来源。spiral / hoop 为兼容旧方案和脚本保留的投影。 */
+  groups?: LayupGroup[]
   /** 螺旋角度组；数组顺序 = 缠绕先后，允许同一角度出现多行，可标记 active=false */
   spiral: GroupSpec[]
   /** 环向层数（90°） */

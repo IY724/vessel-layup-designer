@@ -2,7 +2,7 @@ import type { WorkBook } from 'xlsx'
 import reference from '../core/courseReference.json'
 
 export interface ComparedCell { sheet: string; originalSheet: string; address: string; reference: number; expected: number; corrected: boolean; actual: number | null; difference: number | null; pass: boolean }
-/** 独立基准：只用原表缓存的厚度、局部角和材料量修正余弦项。 */
+/** 仅修正原表的余弦平方项；厚度、局部角和材料量仍取原表独立缓存。 */
 function correctedPressure(sheet: typeof reference[number]['sheets'][number], row: number): number {
   const n = sheet.numeric as Record<string, number>
   if (n[`E${row}`] < n.I3) return 0

@@ -94,7 +94,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
         </div>
         <KV
           rows={[
-            ['初估参考角', `${n(input.constraint.alphaRef, 1)}°`],
+            ['筒身初算采用角度', `${n(input.constraint.alphaRef, 1)}°`],
             ['螺旋层厚度初估', `${n(cy.estimate.hSpiral)} mm → ${cy.estimate.nSpiral} 层`],
             ['环向层厚度初估', `${n(cy.estimate.hHoop)} mm → ${cy.estimate.nHoop} 层`],
             ['估算纤维总厚 / 含树脂总厚', `${n(cy.estimate.hTotal)} / ${n(cy.estimate.tComposite)} mm`],
@@ -178,7 +178,7 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
               <tr>
                 <th>平行圆半径 r /mm</th>
                 {dome.groups.map((gr) => (
-                  <th key={gr.angle}>{gr.angle}° 层厚</th>
+                  <th key={dome.groups.indexOf(gr)}>{Number(gr.angle.toFixed(3))}° 层厚</th>
                 ))}
                 <th>总厚</th>
                 <th>各层爆压相加</th>
@@ -210,12 +210,12 @@ export function DetailView({ input, result }: { input: DesignInput; result: Chec
       {selected && <div className="grp">
         <b>螺旋铺层校验</b>
         <select aria-label="校验角度" value={groupIndex} onChange={e=>setGroupIndex(Number(e.target.value))} style={{marginLeft:16}}>
-          {dome.groups.map((g,i)=><option key={i} value={i}>{g.angle}°（第{i+1}组）</option>)}
+          {dome.groups.map((g,i)=><option key={i} value={i}>{Number(g.angle.toFixed(3))}°（第{i+1}组）</option>)}
         </select>
         <div className="tablewrap" style={{maxHeight:360}}>
-          <table className="grid"><thead><tr><th>极孔直径 / mm</th><th>2倍带宽内厚度 / mm</th><th>2倍带宽外厚度 / mm</th><th>厚度 / mm</th><th>层数</th><th>总厚度 / mm</th><th>封头局部角 K / °</th><th>局部参考爆压 / MPa</th></tr></thead>
+          <table className="grid"><thead><tr><th>平行圆半径 / mm</th><th>2倍带宽内厚度 / mm</th><th>2倍带宽外厚度 / mm</th><th>厚度 / mm</th><th>层数</th><th>总厚度 / mm</th><th>封头局部角 K / °</th><th>局部参考爆压 / MPa</th></tr></thead>
           <tbody>{dome.profile.map(p=><tr key={p.r}>
-            <td>{n(p.r,1)}</td><td>{n(p.r>selected.splineEndRadius?0:Math.max(0,splineAt(selected,p.r)))}</td><td>{n(coverageAt(selected,p.r))}</td><td>{n(layerThickness(selected,p.r))}</td><td>{selected.cycles}</td><td>{n(layerThickness(selected,p.r)*selected.cycles)}</td><td>{p.r<selected.r0?'—':n(Math.asin(selected.r0/p.r)/COURSE_PI*180)}</td><td>{n(groupPressure(selected,p.r,g.R,d.sigmaComposite))}</td>
+            <td>{n(p.r,1)}</td><td>{p.r>selected.splineEndRadius?'—':n(Math.max(0,splineAt(selected,p.r)))}</td><td>{p.r<selected.rb?'—':n(coverageAt(selected,p.r))}</td><td>{n(layerThickness(selected,p.r))}</td><td>{selected.cycles}</td><td>{n(layerThickness(selected,p.r)*selected.cycles)}</td><td>{p.r<selected.r0?'—':n(Math.asin(selected.r0/p.r)/COURSE_PI*180)}</td><td>{n(groupPressure(selected,p.r,g.R,d.sigmaComposite))}</td>
           </tr>)}</tbody></table>
         </div>
       </div>}

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { DesignInput, GeometryInput, LayupPlan } from '../core/types'
 import { runCheck } from '../core/checker'
 import { defaultInput } from '../core/presets'
+import { layupGroups, planFromRows } from '../core/layup'
 
 const KEY = 'vessel-layup-designer.input.v1'
 
@@ -18,10 +19,9 @@ function load(): DesignInput {
         const originalPlan=JSON.stringify(parsed.plan.spiral.map(g=>[g.angle,g.layers]))===JSON.stringify([[10,4],[17,4],[25,4],[37,2],[40,2],[45,2]])
         if(originalPlan && parsed.geometry.R===173.5 && parsed.material.bandWidth*parsed.material.strandCount===20){
           parsed.plan.spiral=parsed.plan.spiral.map(g=>g.angle===45&&g.splineEndRadius===undefined?{...g,splineEndRadius:163}:g)
-          if(parsed.constraint.manualSpiralEstimate===undefined)parsed.constraint.manualSpiralEstimate=14
-          if(parsed.constraint.manualHoopEstimate===undefined)parsed.constraint.manualHoopEstimate=24
         }
-        return parsed
+        return { ...parsed, constraint: { ...parsed.constraint, alphaRef: parsed.constraint.alphaRef ?? 20,
+          manualSpiralEstimate: null, manualHoopEstimate: null, preserveCourseSelections: false }, plan: planFromRows(layupGroups(parsed.plan)) }
       }
     }
   } catch {

@@ -45,9 +45,8 @@ export function poleTable(R: number, anglesDeg: number[]): PoleRow[] {
 }
 
 /**
- * 极孔一致性校验：设计输入的缠绕极孔 r₀ 应≈最低角度组的 R·sinα_min。
- * 两个判据任一超差即报警：① 半径偏差 > 1 倍总带宽；② 反算角度与 α_min 差 > alphaTolDeg。
- * （只按半径判据会漏判：R 较大时几毫米偏差对应的角度差可能很大）
+ * 极孔下限校验：较大角度可对应扩孔后的起铺圆，不要求与初始极孔角相等。
+ * 仅在选用角度对应的极孔明显小于输入初始极孔时提示；初估参考角不参与此校验。
  */
 export function checkPoleConsistency(
   R: number,
@@ -60,14 +59,8 @@ export function checkPoleConsistency(
   const dev = r0Input - r0Geodesic
   const implied = angleFromPoleRadius(R, r0Input)
   const dAlpha = Number.isNaN(implied) ? Infinity : implied - alphaMinDeg
-  const level: 'ok' | 'warn' =
-    Math.abs(dev) <= bandTotal && Math.abs(dAlpha) <= alphaTolDeg ? 'ok' : 'warn'
-  const text =
-    level === 'ok'
-      ? `极孔一致性：r_0=${r0Input.toFixed(2)} ≈ R·sin${alphaMinDeg}°=${r0Geodesic.toFixed(2)}` +
-        `（偏差 ${dev >= 0 ? '+' : ''}${dev.toFixed(2)} mm / ${dAlpha >= 0 ? '+' : ''}${dAlpha.toFixed(2)}°，在容差内）`
-      : `极孔半径与铺层角度不吻合，偏差 ${dev >= 0 ? '+' : ''}${dev.toFixed(2)} mm（由 r_0 反算的角度 ${Number.isNaN(implied) ? '—' : implied.toFixed(2) + '°'}，` +
-        `与最低角度组 ${alphaMinDeg}° 差 ${dAlpha >= 0 ? '+' : ''}${dAlpha.toFixed(2)}°）已超出容差，` +
-        '请确认这里填的是缠绕极孔半径，还是瓶口内半径 + 极孔处内衬厚'
+  const valid = Number.isFinite(R) && Number.isFinite(r0Input) && R > r0Input && r0Input > 0
+  const level: 'ok' | 'warn' = !valid || dev > bandTotal || dAlpha > alphaTolDeg ? 'warn' : 'ok'
+  const text = !valid ? '请检查极孔半径。' : level === 'warn' ? '最小螺旋角过小，请增大角度。' : '螺旋角满足极孔要求。'
   return { r0Geodesic, dev, implied, dAlpha, level, text }
 }

@@ -115,7 +115,7 @@ export function splineAt(g: DomeGroup, r: number): number {
 
 /** 覆盖公式值（r > rb） */
 export function coverageAt(g: DomeGroup, r: number): number {
-  if (r <= g.rb) return 0
+  if (r < g.rb) return 0
   const k = (g.mR * g.nR * g.tp) / COURSE_PI
   return k * (Math.acos(clamp1(g.r0 / r)) - Math.acos(clamp1(g.rb / r)))
 }
@@ -132,7 +132,7 @@ export function groupThickness(g: DomeGroup, r: number): number {
   return layerThickness(g, r) * g.cycles
 }
 
-/** 组局部爆破压强贡献 p_g(r) = 2·t_g·σc/R·cos²αg(r)（未乘 ks） */
+/** 逐半径爆破压强贡献：原表流程，余弦项修正为 cos²αg(r)，未乘 ks。 */
 export function groupPressure(
   g: DomeGroup,
   r: number,
@@ -143,7 +143,6 @@ export function groupPressure(
   const t = groupThickness(g, r)
   const localDegrees = Math.asin(clamp1(g.r0 / r)) / COURSE_PI * 180
   const u = localDegrees / 180 * Math.PI
-  // 保持原局部角转换，余弦项采用平方。
   return ((2 * t * sigmaComposite) / R) * Math.cos(u) ** 2
 }
 

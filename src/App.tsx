@@ -104,7 +104,7 @@ export default function App() {
         </Modal>
       )}
       {expand === 'curve' && (
-        <Modal title="封头局部参考爆压分布" onClose={() => setExpand(null)} wide>
+        <Modal title="封头爆破压强分布" onClose={() => setExpand(null)} wide>
           <PressureChart input={input} result={result} W={1360} H={620} />
         </Modal>
       )}

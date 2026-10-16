@@ -17,9 +17,8 @@ function Row(props: { k: string; v: string; unit?: string; note?: string; cls?: 
 }
 
 export function Overview({ result }: { result: CheckResult; input: DesignInput }) {
-  const { cylinder: cy, dome, head, derived } = result
+  const { cylinder: cy, head, derived } = result
   const pb = derived.pb
-  const last = dome.profile[dome.profile.length - 1]
   const verdict = result.verdict === 'pass' ? '满足' : result.verdict === 'adjust' ? '待调整' : '不满足'
   const margin = Math.min(cy.paMargin, cy.pthMargin)
 
@@ -59,13 +58,10 @@ export function Overview({ result }: { result: CheckResult; input: DesignInput }
               </td>
             </tr>
             <Row k="纵向爆破压强 p_α" v={n2(cy.pa)} unit="MPa" cls={cy.paPass ? 'ok' : 'bad'} note={`需 ≥ p_b = ${n2(pb, 1)}；裕度 ${cy.paMargin >= 0 ? '+' : ''}${n2(cy.paMargin * 100, 1)}%`} />
-            <Row k="环向爆破压强 p_θ" v={n2(cy.pth)} unit="MPa" cls={cy.pthPass ? 'ok' : 'bad'} note={`需 ≥ p_b = ${n2(pb, 1)}；其中环向层贡献 ${n2(cy.rows[cy.rows.length - 1]?.pthSum ?? 0)}`} />
+            <Row k="环向爆破压强 p_θ" v={n2(cy.pth)} unit="MPa" cls={cy.pthPass ? 'ok' : 'bad'} note={`需 ≥ p_b = ${n2(pb, 1)}；其中环向层贡献 ${n2(cy.rows.filter(g => g.type === 'hoop').reduce((s, g) => s + g.pthSum, 0))}`} />
             <Row k="筒身最小裕度" v={`${margin >= 0 ? '+' : ''}${n2(margin * 100, 1)}`} unit="%" note="取纵向、环向中较差的一个" />
             <Row k="筒身总厚度" v={n2(cy.totalThickness)} unit="mm" note={`螺旋 ${n2(cy.spiralThickness)} + 环向 ${n2(cy.hoopThickness)}`} />
             <Row k="封头经验初估" v={n2(head.pressure)} unit="MPa" cls={head.pass ? 'ok' : 'bad'} note={`需 ≥ ${n2(pb, 1)}；筒身角 α₀`} />
-            <Row k="局部曲线最低值" v={n2(dome.minP, 3)} unit="MPa" note={`参考值；r=${n2(dome.minPR, 1)} mm，局部角 K`} />
-            <Row k="局部曲线赤道值" v={n2(last ? last.pTotal : 0, 2)} unit="MPa" note="参考值" />
-            <Row k="封头赤道处总厚" v={n2(dome.tAtR)} unit="mm" note={`筒身螺旋层厚 ${n2(cy.spiralThickness)}；偏差 ${result.consistency.diff >= 0 ? '+' : ''}${n2(result.consistency.diff, 3)}`} />
           </tbody>
         </table>
       </div>

@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs'
 import { CFB, utils, type WorkBook } from 'xlsx'
 import type { CheckResult, DesignInput } from '../core/types'
+import { layupGroups } from '../core/layup'
 import images from './formulaImages.json'
 import { addNativeCharts, type NativeChart } from './nativeCharts'
 
@@ -63,12 +64,12 @@ function domeMap(source:WorkBook,name:string):AddressMap{
   Object.assign(m,{M8:'G22',M9:'H23',O8:'G24',O9:'H25',K9:'E22',M17:'F36',N17:'G36'})
   mapRange(m,`E22:L${utils.decode_range(source.Sheets[name]['!ref']!).e.r+1}`,'A40');return m
 }
-function cylinderMap(n:number):AddressMap{
+function cylinderMap(n:number,mh:number):AddressMap{
   const m:AddressMap={};mapRange(m,'A2:D11','A5');mapRange(m,`H2:L${n+2}`,'A18')
   const hh=n+5,h90=2*n+9
-  mapRange(m,`H${hh}:L${hh+n}`,`A${n+22}`);mapRange(m,`H${h90}:L${h90+1}`,`A${2*n+26}`)
-  mapRange(m,`I${h90+4}:J${h90+5}`,`G${n+22}`);mapRange(m,`I${h90+8}:K${h90+9}`,`F${n+27}`)
-  ;[16,17,18,20,24,27,29,31,33].forEach((r,i)=>{m[`A${r}`]=`A${2*n+32+i}`;m[`B${r}`]=`C${2*n+32+i}`;m[`C${r}`]=`D${2*n+32+i}`});return m
+  mapRange(m,`H${hh}:L${hh+n}`,`A${n+22}`);mapRange(m,`H${h90}:M${h90+mh}`,`A${2*n+26}`)
+  mapRange(m,`I${h90+mh+3}:J${h90+mh+4}`,`H${n+22}`);mapRange(m,`I${h90+mh+7}:K${h90+mh+8}`,`G${n+27}`)
+  ;[16,17,18,20,24,27,29,31,33].forEach((r,i)=>{m[`A${r}`]=`A${2*n+mh+31+i}`;m[`B${r}`]=`C${2*n+mh+31+i}`;m[`C${r}`]=`D${2*n+mh+31+i}`});return m
 }
 /** 排版仅重定位单元格；公式中的引用同步映射。 */
 export function translated(formula:string,current:string,maps:Record<string,AddressMap>):string{
@@ -93,21 +94,22 @@ function params(ws:Sheet,last:number){
   }
 }
 function cylinder(ws:Sheet,res:CheckResult){
+  const mh=Math.max(1,res.cylinder.rows.filter(g=>g.type==='hoop').length)
   const n=res.cylinder.rows.filter(r=>r.type==='spiral').length
-  base(ws,[9,37,19,20,20,20,22,22],5);title(ws,'筒身强度校核');params(ws,14)
+  base(ws,[9,37,19,20,20,20,20,22,22],5);title(ws,'筒身强度校核','I');params(ws,14)
   section(ws,17,'缠绕角参数','A','E');table(ws,`A18:E${18+n}`)
   for(let r=19;r<=18+n;r++){input(ws,`A${r}`,'0.0');input(ws,`E${r}`,'0')}
   section(ws,n+21,'螺旋缠绕强度','A','E');table(ws,`A${n+22}:E${2*n+22}`)
-  section(ws,2*n+25,'环向缠绕强度','A','E');table(ws,`A${2*n+26}:E${2*n+27}`);ws.getRow(2*n+26).height=60;input(ws,`D${2*n+27}`,'0')
-  table(ws,`G${n+22}:H${n+23}`);ws.getRow(n+22).height=60
-  for(const c of ['G','H'])ws.addConditionalFormatting({ref:`${c}${n+23}`,rules:[{type:'cellIs',operator:'lessThan',formulae:['$C$13'],priority:1,style:{fill:fill(C.red)}}]})
-  table(ws,`F${n+27}:H${n+28}`);['螺旋缠绕厚度\nmm','环向缠绕厚度\nmm','总厚度\nmm'].forEach((s,i)=>ws.getCell(n+27,i+6).value=s);section(ws,2*n+31,'缠绕层厚度估算','A','D')
+  section(ws,2*n+25,'环向缠绕强度','A','E');table(ws,`A${2*n+26}:F${2*n+26+mh}`);ws.getRow(2*n+26).height=60;for(let i=0;i<mh;i++){input(ws,`A${2*n+27+i}`,'0.000');input(ws,`D${2*n+27+i}`,'0')}
+  table(ws,`H${n+22}:I${n+23}`);ws.getRow(n+22).height=60
+  for(const c of ['H','I'])ws.addConditionalFormatting({ref:`${c}${n+23}`,rules:[{type:'cellIs',operator:'lessThan',formulae:['$C$13'],priority:1,style:{fill:fill(C.red)}}]})
+  table(ws,`G${n+27}:I${n+28}`);['螺旋缠绕厚度\nmm','环向缠绕厚度\nmm','总厚度\nmm'].forEach((s,i)=>ws.getCell(n+27,i+7).value=s);section(ws,2*n+mh+30,'缠绕层厚度估算','A','D')
   for(let i=0;i<9;i++){
-    const r=2*n+32+i;text(ws,`A${r}:B${r}`,String(ws.getCell(`A${r}`).value??''));table(ws,`A${r}:D${r}`,false)
+    const r=2*n+mh+31+i;text(ws,`A${r}:B${r}`,String(ws.getCell(`A${r}`).value??''));table(ws,`A${r}:D${r}`,false)
     ws.getCell(`C${r}`).numFmt='0.000000';ws.getRow(r).height=28
   }
-  for(const i of [5,6])input(ws,`D${2*n+32+i}`,'0" 层"')
-  ws.pageSetup.printArea=`A1:H${2*n+40}`;ws.pageSetup.printTitlesRow='1:2'
+  for(const i of [5,6]){const cell=ws.getCell(`D${2*n+mh+31+i}`);cell.numFmt='0" 层"';cell.fill=fill(cell.formula?C.calc:C.input)}
+  ws.pageSetup.printArea=`A1:I${2*n+mh+39}`;ws.pageSetup.printTitlesRow='1:2'
 }
 function dome(ws:Sheet,res:CheckResult,index:number){
   const g=res.dome.groups[index],end=res.dome.profile.length+40
@@ -127,10 +129,10 @@ function dome(ws:Sheet,res:CheckResult,index:number){
   for(let r=30;r<=33;r++)ws.getCell(`G${r}`).numFmt='0.000000000E+00'
   table(ws,'G22:H25',false);ws.getCell('H23').numFmt='0.000000';ws.getCell('H25').numFmt='0.000000'
   ws.getCell('G26').value='Vconst';ws.getCell('H26').value=live('E26',g.Vconst);table(ws,'G26:H26',false)
-  table(ws,'F36:H37',false);ws.getCell('F36').value='样条选取上限';ws.getCell('H36').value='mm';if(!ws.getCell('G36').formula)input(ws,'G36')
+  table(ws,'F36:H37',false);ws.getCell('F36').value='厚度公式切换半径';ws.getCell('H36').value='mm';if(!ws.getCell('G36').formula)input(ws,'G36')
   ws.getCell('F37').value='层数';ws.getCell('G37').value=live('E41',g.cycles);ws.getCell('H37').value='循环';input(ws,'E41','0.0')
   section(ws,39,'逐点厚度与局部参考值');table(ws,`A40:H${end}`)
-  ;['极孔直径\nmm','2倍带宽内厚度\nmm','2倍带宽外厚度\nmm','厚度\nmm','层数','总厚度\nmm','封头局部角 K\n°','局部参考爆压\nMPa'].forEach((s,i)=>ws.getCell(40,i+1).value=s)
+  ;['平行圆半径\nmm','2倍带宽内厚度\nmm','2倍带宽外厚度\nmm','厚度\nmm','层数','总厚度\nmm','封头局部角 K\n°','局部参考爆压\nMPa'].forEach((s,i)=>ws.getCell(40,i+1).value=s)
   ws.getRow(40).height=50
   for(let r=41;r<=end;r++){ws.getCell(`A${r}`).numFmt='0.0';ws.getCell(`E${r}`).numFmt='0.0';ws.getCell(`G${r}`).numFmt='0.0000'}
   ws.autoFilter=`A40:H${end}`;ws.pageSetup.printArea=`A1:H${end}`;ws.pageSetup.printTitlesRow='40:40';ws.getRow(39).addPageBreak()
@@ -143,30 +145,38 @@ function totals(ws:Sheet,res:CheckResult,pressure:boolean){
   for(let r=5;r<=end;r++)ws.getCell(`A${r}`).numFmt='0.0'
   ws.autoFilter=`A4:${col(last)}${end}`;ws.pageSetup.printArea=`A1:${col(last)}${end}`;ws.pageSetup.printTitlesRow='4:4'
 }
-function layup(ws:Sheet,data:DesignInput,res:CheckResult){
+function layup(ws:Sheet,data:DesignInput,res:CheckResult,maps:Record<string,AddressMap>){
   base(ws,[8,13,14,12,17,19,19,20,20,20,20],4);title(ws,'铺层方案','K')
+  const n=res.cylinder.rows.filter(g=>g.type==='spiral').length,h90=2*n+9,hh=n+5
+  let si=0,hi=0
+  const f=(address:string,value:number)=>live(`'筒身强度设计与计算'!${maps['筒身强度设计与计算'][address]}`,value)
   rows(ws,4,[['序号','缠绕类型','缠绕角度\n°','层数','缠绕角弧度','cosα平方','sinα平方','纵向单层爆压\nMPa','环向单层爆压\nMPa','纵向多层爆压\nMPa','环向多层爆压\nMPa'],...res.cylinder.rows.map((g,i)=>{
-    const n=res.dome.groups.length,r=19+i,s=n+23+i,q="'筒身强度设计与计算'!",f=(a:string,v:number)=>live(q+a,v)
-    return [i+1,g.type==='spiral'?'螺旋':'环向',g.type==='spiral'?f(`A${r}`,g.angle):90,g.type==='spiral'?f(`E${r}`,g.layers):f(`D${2*n+27}`,g.layers),g.type==='spiral'?f(`B${r}`,g.angle*3.1415926/180):'',g.type==='spiral'?f(`C${r}`,Math.cos(g.angle*3.1415926/180)**2):'',g.type==='spiral'?f(`D${r}`,Math.sin(g.angle*3.1415926/180)**2):'',g.type==='spiral'?f(`B${s}`,g.paUnit):0,g.type==='spiral'?f(`C${s}`,g.pthUnit):f(`C${2*n+27}`,g.pthUnit),g.type==='spiral'?f(`D${s}`,g.paSum):0,g.type==='spiral'?f(`E${s}`,g.pthSum):f(`E${2*n+27}`,g.pthSum)]
+    const a=g.angle*3.1415926/180
+    if(g.type==='spiral'){
+      const k=si++,r=3+k,s=hh+1+k
+      return [i+1,'螺旋',f(`H${r}`,g.angle),f(`L${r}`,g.layers),f(`I${r}`,a),f(`J${r}`,Math.cos(a)**2),f(`K${r}`,Math.sin(a)**2),f(`I${s}`,g.paUnit),f(`J${s}`,g.pthUnit),f(`K${s}`,g.paSum),f(`L${s}`,g.pthSum)]
+    }
+    const r=h90+1+hi++,row=i+5
+    return [i+1,'环向',f(`H${r}`,g.angle),f(`K${r}`,g.layers),live(`C${row}/180*3.1415926`,a),live(`COS(E${row})^2`,Math.cos(a)**2),live(`SIN(E${row})^2`,Math.sin(a)**2),f(`I${r}`,g.paUnit),f(`J${r}`,g.pthUnit),f(`M${r}`,g.paSum),f(`L${r}`,g.pthSum)]
   })])
-  const end=res.cylinder.rows.length+5;ws.getRow(end).values=['合计','','',res.cylinder.spiralLayers+res.cylinder.hoopLayers,'','','','','',res.cylinder.pa,res.cylinder.pth];table(ws,`A${end}:K${end}`,false)
+  const end=res.cylinder.rows.length+5;ws.getRow(end).values=['合计','','',res.cylinder.spiralLayers+res.cylinder.hoopLayers,'','','','','',live(`SUM(J5:J${end-1})`,res.cylinder.pa),live(`SUM(K5:K${end-1})`,res.cylinder.pth)];table(ws,`A${end}:K${end}`,false)
   for(let r=5;r<=end;r++)for(const c of ['A','D'])ws.getCell(`${c}${r}`).numFmt='0'
   ws.getRow(4).height=58
-  const inactive=data.plan.spiral.filter(g=>g.active===false||g.layers<=0)
-  if(inactive.length)text(ws,`A${end+2}:K${end+2}`,`停用组：${inactive.map(g=>`${g.angle}° / ${g.layers}层`).join('，')}`)
+  const inactive=layupGroups(data.plan).filter(g=>g.active===false||g.layers<=0)
+  if(inactive.length)text(ws,`A${end+2}:K${end+2}`,`停用组：${inactive.map(g=>`${g.type==='hoop'?'环向':'螺旋'} ${g.angle}° / ${g.layers}层`).join('，')}`)
   ws.pageSetup.printArea=`A1:K${end+2}`
 }
 function summary(ws:Sheet,data:DesignInput,res:CheckResult,maps:Record<string,AddressMap>):NativeChart{
   base(ws,[28,20,20,20,18,22,18,22],4);title(ws,'气瓶铺层计算书')
   ws.getRow(4).values=['设计爆破压强',res.derived.pb,'筒身半径 R',data.geometry.R,'平衡系数 Ks',data.requirement.ks,'单位','mm / MPa'];table(ws,'A4:H4',false)
   text(ws,'A5:H5','封头经验初估：筒身角 α₀；局部角 K 曲线仅作参考。',10)
-  const target=(a:string)=>`'筒身强度设计与计算'!${maps['筒身强度设计与计算'][a]}`,n=res.dome.groups.length,r=2*n+14,end=res.dome.profile.length+4
+  const target=(a:string)=>`'筒身强度设计与计算'!${maps['筒身强度设计与计算'][a]}`,n=res.cylinder.rows.filter(g=>g.type==='spiral').length,mh=Math.max(1,res.cylinder.rows.filter(g=>g.type==='hoop').length),r=2*n+mh+13,end=res.dome.profile.length+4
   rows(ws,7,[['项目','计算值 / MPa','设计值 / MPa','差值 / MPa','结果','位置 r / mm'],
     ['筒身纵向',live(target(`I${r}`),res.cylinder.pa),live('$B$4',res.derived.pb),live('B8-C8',res.cylinder.pa-res.derived.pb),live('IF(B8>=C8,"满足","不足")',res.cylinder.paPass?'满足':'不足'),''],
     ['筒身环向',live(target(`J${r}`),res.cylinder.pth),live('$B$4',res.derived.pb),live('B9-C9',res.cylinder.pth-res.derived.pb),live('IF(B9>=C9,"满足","不足")',res.cylinder.pthPass?'满足':'不足'),''],
-    ['封头经验初估',live('F4*B8',res.head.pressure),live('$B$4',res.derived.pb),live('B10-C10',res.head.pressure-res.derived.pb),live('IF(B10>=C10,"满足","不足")',res.head.pass?'满足':'不足'),''],
+    ['封头经验初估',live(`F4*SUM('筒身强度设计与计算'!D${n+23}:D${2*n+22})`,res.head.pressure),live('$B$4',res.derived.pb),live('B10-C10',res.head.pressure-res.derived.pb),live('IF(B10>=C10,"满足","不足")',res.head.pass?'满足':'不足'),''],
     ['局部参考最低值',live(`MIN('封头总爆破压强'!C5:C${end})`,res.dome.minP),'','','参考',live(`INDEX('封头总爆破压强'!A5:A${end},MATCH(B11,'封头总爆破压强'!C5:C${end},0))`,res.dome.minPR)]])
-  rows(ws,13,[['厚度项目','计算值 / mm'],['筒身螺旋层',live(target(`I${2*n+18}`),res.cylinder.spiralThickness)],['筒身环向层',live(target(`J${2*n+18}`),res.cylinder.hoopThickness)],['筒身总厚度',live(target(`K${2*n+18}`),res.cylinder.totalThickness)],['封头赤道总厚度',live(`'封头总厚度'!B${end}`,res.dome.tAtR)]])
+  rows(ws,13,[['厚度项目','计算值 / mm'],['筒身螺旋层',live(target(`I${2*n+mh+17}`),res.cylinder.spiralThickness)],['筒身环向层',live(target(`J${2*n+mh+17}`),res.cylinder.hoopThickness)],['筒身总厚度',live(target(`K${2*n+mh+17}`),res.cylinder.totalThickness)],['封头赤道总厚度',live(`'封头总厚度'!B${end}`,res.dome.tAtR)]])
   section(ws,20,'计算表');const names=['铺层方案','筒身强度设计与计算',...Object.keys(maps).filter(n=>n.startsWith('封头-')),'封头总厚度','封头总爆破压强','公式说明']
   names.forEach((name,i)=>{const cell=ws.getCell(22+Math.floor(i/2),i%2?5:1);cell.value={text:name,hyperlink:`#'${name}'!A1`};cell.font={name:'微软雅黑',size:11,color:{argb:C.blue},underline:true}})
   ws.pageSetup.printArea='A1:H31'
@@ -194,11 +204,11 @@ export async function writePresentation(source:WorkBook,data:DesignInput,res:Che
   const wb=new ExcelJS.Workbook();wb.creator='复合材料气瓶缠绕铺层设计软件';wb.title='气瓶铺层计算书';wb.calcProperties.fullCalcOnLoad=true
   const names=source.SheetNames.filter(n=>n.startsWith('封头-'))
   for(const name of ['方案汇总','铺层方案','筒身强度设计与计算',...names,'封头总厚度','封头总爆破压强','厚度分布','爆压分布','公式说明'])wb.addWorksheet(name)
-  const maps:Record<string,AddressMap>={'筒身强度设计与计算':cylinderMap(res.dome.groups.length)}
+  const maps:Record<string,AddressMap>={'筒身强度设计与计算':cylinderMap(res.cylinder.rows.filter(g=>g.type==='spiral').length,Math.max(1,res.cylinder.rows.filter(g=>g.type==='hoop').length))}
   for(const name of names)maps[name]=domeMap(source,name)
   for(const name of ['封头总厚度','封头总爆破压强']){maps[name]={};mapRange(maps[name],source.Sheets[name]['!ref']!,'A4')}
   copySource(source,wb,maps);cylinder(wb.getWorksheet('筒身强度设计与计算')!,res);names.forEach((name,i)=>dome(wb.getWorksheet(name)!,res,i))
-  totals(wb.getWorksheet('封头总厚度')!,res,false);totals(wb.getWorksheet('封头总爆破压强')!,res,true);layup(wb.getWorksheet('铺层方案')!,data,res)
+  totals(wb.getWorksheet('封头总厚度')!,res,false);totals(wb.getWorksheet('封头总爆破压强')!,res,true);layup(wb.getWorksheet('铺层方案')!,data,res,maps)
   const charts=[summary(wb.getWorksheet('方案汇总')!,data,res,maps),distribution(wb.getWorksheet('厚度分布')!,res,false),distribution(wb.getWorksheet('爆压分布')!,res,true)]
   formulas(wb)
   for(const ws of wb.worksheets)ws.eachRow(row=>row.eachCell(cell=>{if(cell.value==='')cell.value=null}))

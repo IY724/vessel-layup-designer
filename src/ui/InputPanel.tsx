@@ -2,10 +2,12 @@
 import { useMemo } from 'react'
 import type { DesignStore } from '../state/store'
 import { Section, Num, Radio } from './fields'
-import { angleFromPoleRadius, checkPoleConsistency } from '../core/geodesic'
+import { checkPoleConsistency } from '../core/geodesic'
 import { compositeLayerThickness, fiberLayerThickness, totalBandWidth } from '../core/materials'
 import { FormulaHelp } from './FormulaHelp'
 import { sym } from './Sym'
+import { spiralGroups } from '../core/layup'
+import { InitialEstimateFields } from './InitialEstimateFields'
 
 const f = (v: number, n = 4) => (Number.isFinite(v) ? v.toFixed(n).replace(/\.?0+$/, '') : '—')
 
@@ -22,12 +24,11 @@ export function InputPanel({ store }: { store: DesignStore }) {
   const band = totalBandWidth(m)
 
   const minAngle = useMemo(() => {
-    const a = input.plan.spiral.filter((x) => x.layers > 0).map((x) => x.angle)
+    const a = spiralGroups(input.plan).filter((x) => x.active !== false && x.layers > 0).map((x) => x.angle)
     return a.length ? Math.min(...a) : null
-  }, [input.plan.spiral])
+  }, [input.plan])
 
   const consistency = minAngle === null ? null : checkPoleConsistency(g.R, d.r0, minAngle, band)
-  const implied = angleFromPoleRadius(g.R, d.r0)
 
   return (
     <div className="inputs panel">
@@ -61,15 +62,7 @@ export function InputPanel({ store }: { store: DesignStore }) {
             <Num label="极孔处内衬厚度" value={g.linerAtPole} unit="mm" step={0.5} onChange={(v) => v !== null && setGeometry({ linerAtPole: v })} />
           </>
         )}
-        <div className={`hint${consistency && consistency.level !== 'ok' ? ' warn' : ''}`}>
-          缠绕极孔 {sym('r_0')} = {f(d.r0, 3)} mm，对应测地线角 α = <b>{f(implied, 2)}°</b>
-          {minAngle !== null && consistency && (
-            <>
-              <br />
-              {sym(consistency.text)}
-            </>
-          )}
-        </div>
+        {consistency?.level === 'warn' && <div className="hint warn pole-advice" role="status">{consistency.text}</div>}
         <Num
           label="封头深度 b（半椭球短半轴）"
           value={g.headShortAxis}
@@ -217,9 +210,9 @@ export function InputPanel({ store }: { store: DesignStore }) {
         />
       </Section>
 
-      <Section title="初估层数">
-        <Num label="螺旋手选层数" value={input.constraint.manualSpiralEstimate??null} step={1} onChange={v=>patch('constraint',{manualSpiralEstimate:v})}/>
-        <Num label="环向手选层数" value={input.constraint.manualHoopEstimate??null} step={1} onChange={v=>patch('constraint',{manualHoopEstimate:v})}/>
+      <Section title="筒身层数计算">
+        <Num label="筒身计算角度" value={input.constraint.alphaRef} unit="°" invalid={!(input.constraint.alphaRef>0 && input.constraint.alphaRef<54.7356)} onChange={v => v !== null && patch('constraint', { alphaRef: v })} />
+        <InitialEstimateFields input={input} />
       </Section>
       <Section
         title="结果概览"
@@ -246,7 +239,7 @@ export function InputPanel({ store }: { store: DesignStore }) {
           </div>
           <div>
             封头最厚处 <b>{f(Math.max(...result.dome.profile.map((p) => p.tTotal)))} mm</b> @ r≈
-            {f(result.dome.profile.reduce((a, b) => (b.tTotal > a.tTotal ? b : a), result.dome.profile[0]).r, 1)} mm
+            {f(result.dome.profile.reduce((a, b) => (b.tTotal > a.tTotal ? b : a), result.dome.profile[0])?.r ?? 0, 1)} mm
           </div>
           <div>
             筒身 {result.cylinder.paPass && result.cylinder.pthPass ? '满足' : '不足'}　封头初估{' '}

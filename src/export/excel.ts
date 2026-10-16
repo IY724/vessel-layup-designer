@@ -5,6 +5,8 @@ import * as XLSX from 'xlsx'
 import type { CheckResult, DesignInput, DomeGroup } from '../core/types'
 import { coverageAt, domeAt, groupPressure, layerThickness, solve4, splineAt } from '../core/dome'
 import { COURSE_PI, courseGrid } from '../core/course'
+import { layupGroups, spiralGroups } from '../core/layup'
+import { initialDesign } from '../core/initialDesign'
 
 type WS = XLSX.WorkSheet
 
@@ -68,8 +70,10 @@ function paramBlock(ws: WS, input: DesignInput, res: CheckResult, sigmaLabel: st
 
 function cylinderSheet(input: DesignInput, res: CheckResult): WS {
   const ws: WS = {}
-  const spiral = input.plan.spiral.filter((g) => g.active !== false && g.layers > 0 && g.angle > 0 && g.angle < 90)
+  const spiral = spiralGroups(input.plan).filter((g) => g.active !== false && g.layers > 0 && g.angle > 0 && g.angle < 90)
   const n = spiral.length
+  const hoops = res.cylinder.rows.filter(g => g.type === 'hoop')
+  const m = Math.max(1, hoops.length)
   const d = res.derived
   paramBlock(ws, input, res, '碳纤维发挥强度', 11)
   put(ws, 'F1', '缠绕层设计与强度校核')
@@ -106,24 +110,29 @@ function cylinderSheet(input: DesignInput, res: CheckResult): WS {
   put(ws, `F${lastS + 3}`, '环向缠绕强度计算')
   const h90 = lastS + 4
   ;['缠绕角度', '纵向（单层）', '环向（单层）', '层数', '环向（多层）'].forEach((h, i) => put(ws, `${col(7 + i)}${h90}`, h))
-  put(ws, `H${h90 + 1}`, 90)
-  put(ws, `I${h90 + 1}`, 0)
-  // 环向发挥强度与螺旋不同（模式 B 可分别给定）时写入实际值
-  const hoopSigma = Math.abs(d.sigmaHoop - d.sigmaSpiral) < 1e-9 ? 'C11' : String(d.sigmaHoop)
-  put(ws, `J${h90 + 1}`, { f: `${hoopSigma}*C8/C3` })
-  put(ws, `K${h90 + 1}`, input.plan.hoop)
-  put(ws, `L${h90 + 1}`, { f: `J${h90 + 1}*K${h90 + 1}` })
-
-  put(ws, `I${h90 + 4}`, '气瓶纵向爆破压强/MPa')
-  put(ws, `J${h90 + 4}`, '气瓶环向爆破压强/MPa')
-  put(ws, `I${h90 + 5}`, { f: `SUM(K${hh + 1}:K${lastS})` })
-  put(ws, `J${h90 + 5}`, { f: `SUM(L${hh + 1}:L${lastS},L${h90 + 1})` })
-  put(ws, `I${h90 + 8}`, '筒身段螺旋缠绕厚度/mm')
-  put(ws, `J${h90 + 8}`, '筒身段环向缠绕厚度/mm')
-  put(ws, `K${h90 + 8}`, '总厚度/mm')
-  put(ws, `I${h90 + 9}`, { f: `SUM(L3:L${lastAng})*C9` })
-  put(ws, `J${h90 + 9}`, { f: `K${h90 + 1}*C9` })
-  put(ws, `K${h90 + 9}`, { f: `I${h90 + 9}+J${h90 + 9}` })
+  const hoopSigma = Math.abs(d.sigmaHoop - d.sigmaSpiral) < 1e-9 ? '$C$11' : String(d.sigmaHoop)
+  put(ws, `M${h90}`, '纵向（多层）')
+  for (let i = 0; i < m; i++) {
+    const g = hoops[i] ?? { angle: 90, layers: 0 }
+    const row = h90 + 1 + i
+    put(ws, `H${row}`, g.angle)
+    put(ws, `I${row}`, { f: `IF(H${row}=90,0,2*${hoopSigma}*$C$8*COS(H${row}/180*3.1415926)^2/$C$3)` })
+    put(ws, `J${row}`, { f: `IF(H${row}=90,${hoopSigma}*$C$8/$C$3,${hoopSigma}*$C$8*SIN(H${row}/180*3.1415926)^2/$C$3)` })
+    put(ws, `K${row}`, g.layers)
+    put(ws, `L${row}`, { f: `J${row}*K${row}` })
+    put(ws, `M${row}`, { f: `I${row}*K${row}` })
+  }
+  const total = h90 + m + 4, thick = h90 + m + 8
+  put(ws, `I${total - 1}`, '气瓶纵向爆破压强/MPa')
+  put(ws, `J${total - 1}`, '气瓶环向爆破压强/MPa')
+  put(ws, `I${total}`, { f: `SUM(K${hh + 1}:K${lastS},M${h90 + 1}:M${h90 + m})` })
+  put(ws, `J${total}`, { f: `SUM(L${hh + 1}:L${lastS},L${h90 + 1}:L${h90 + m})` })
+  put(ws, `I${thick - 1}`, '筒身段螺旋缠绕厚度/mm')
+  put(ws, `J${thick - 1}`, '筒身段环向缠绕厚度/mm')
+  put(ws, `K${thick - 1}`, '总厚度/mm')
+  put(ws, `I${thick}`, { f: `SUM(L3:L${lastAng})*C9` })
+  put(ws, `J${thick}`, { f: `SUM(K${h90 + 1}:K${h90 + m})*C9` })
+  put(ws, `K${thick}`, { f: `I${thick}+J${thick}` })
 
   // 厚度估算块（复刻原表 A15:C33）
   const a = input.constraint.alphaRef
@@ -138,14 +147,17 @@ function cylinderSheet(input: DesignInput, res: CheckResult): WS {
   put(ws, 'B20', { f: '(C3*C10)/(2*C11*B17*B17)' })
   put(ws, 'C20', 'mm')
   put(ws, 'A24', '环向厚度估算')
-  put(ws, 'B24', { f: '(2-B18*B18)*C3*C10/(2*C11)' })
+  put(ws, 'B24', { f: `(2-B18*B18)*C3*C10/(2*${Math.abs(d.sigmaHoop-d.sigmaSpiral)<1e-9 ? 'C11' : d.sigmaHoop})` })
   put(ws, 'C24', 'mm')
   put(ws, 'A27', '螺旋向层数估算')
   put(ws, 'B27', { f: 'B20/C8' })
   put(ws, 'A29', '环向层数估算')
   put(ws, 'B29', { f: 'B24/C8' })
-  if (input.constraint.manualSpiralEstimate != null) put(ws, 'C27', input.constraint.manualSpiralEstimate)
-  if (input.constraint.manualHoopEstimate != null) put(ws, 'C29', input.constraint.manualHoopEstimate)
+  const preserve = input.constraint.preserveCourseSelections
+  put(ws, 'C27', preserve && input.constraint.manualSpiralEstimate != null
+    ? input.constraint.manualSpiralEstimate : { f: 'MAX(0,2*ROUNDUP(B27/2,0))' })
+  put(ws, 'C29', preserve && input.constraint.manualHoopEstimate != null
+    ? input.constraint.manualHoopEstimate : { f: 'MAX(0,ROUNDUP(B29,0))' })
   put(ws, 'A31', '估算纤维总厚度')
   put(ws, 'B31', { f: 'B20+B24' })
   put(ws, 'C31', 'mm')
@@ -154,7 +166,7 @@ function cylinderSheet(input: DesignInput, res: CheckResult): WS {
   put(ws, 'C33', 'mm')
 
   // 范围必须盖住 A15:C33 估算块：SheetJS 只写 !ref 内的单元格，角度组少时 h90+9 < 33 会把 B31/B33 丢掉
-  ref(ws, Math.max(h90 + 9, 33), 13)
+  ref(ws, Math.max(thick, 33), 13)
   widths(ws, [6, 34, 16, 8, 2, 22, 2, 12, 16, 16, 18, 18, 12])
   return ws
 }
@@ -188,7 +200,7 @@ function domeSheet(input: DesignInput, res: CheckResult, g: DomeGroup, grid: num
   put(ws, 'N3', 1)
   put(ws, 'O3', { f: 'C9' })
   put(ws, 'P3', { f: '2*N3*O3' })
-  put(ws, 'M17', '样条分段末点（手工选择）')
+  put(ws, 'M17', '厚度公式切换半径')
   put(ws, 'N17', g.manualSplineEndRadius == null ? {f:'J3'} : g.manualSplineEndRadius)
 
   // 与原表同址：F5:I8 条件矩阵，K5:K8 右端项，F11:I14 逆矩阵，G17:G20 系数。
@@ -224,7 +236,7 @@ function domeSheet(input: DesignInput, res: CheckResult, g: DomeGroup, grid: num
   })
 
   const head = 22
-  put(ws, `E${head}`, '极孔直径（原表列名）')
+  put(ws, `E${head}`, '平行圆半径/mm')
   put(ws, `F${head}`, '2倍带宽内厚度/mm')
   put(ws, `G${head}`, '2倍带宽外厚度')
   put(ws, `H${head}`, '厚度')
@@ -323,10 +335,9 @@ function summarySheet(input: DesignInput, res: CheckResult): WS {
   line('σc 复材层强度 (MPa)', d.sigmaComposite)
   line('')
   line('【铺层方案（表序 = 缠绕先后）】')
-  input.plan.spiral.forEach((g, i) =>
-    line(`  第${i + 1}组 ${g.angle}°`, g.active === false ? `${g.layers} 层（未激活，不参与计算）` : `${g.layers} 层（±成对）`),
+  layupGroups(input.plan).forEach((g, i) =>
+    line(`  第${i + 1}组 ${g.type === 'hoop' ? '环向' : '螺旋'} ${g.angle}°`, `${g.layers} 层${g.active === false ? '（未激活，不参与计算）' : ''}`),
   )
-  line('  环向 90°', `${input.plan.hoop} 层`)
   line('')
   line('【筒身校核】')
   line('纵向爆压 pα (MPa)', Number(c.pa.toFixed(4)))
@@ -363,7 +374,7 @@ function notesSheet(): WS {
     ['常数', 'π₀=3.1415926；π=PI()。'],
     ['封头局部参考值', 'COS(K/180*PI())^2。'],
     ['封头经验初估', '筒身角 α₀、纯纤维厚度与纤维强度。'],
-    ['样条分段', '按各组样条选取上限切换覆盖关系。'],
+    ['厚度计算', '极孔两倍总带宽内取三次样条，外侧取覆盖公式；原参考方案保留其逐点选值。'],
     ['层数初估', '保留小数估算及独立手选层数。'],
     ['矩阵与系数', '矩阵求逆和系数保留活公式。'],
   ]
@@ -426,13 +437,18 @@ function cacheResults(wb: XLSX.WorkBook, input: DesignInput, res: CheckResult, g
     })) set(cy, address, value)
   })
   const estimate = c.estimate
-  const hoopUnit = d.sigmaHoop * d.tf / R
+  const initial = initialDesign(input)
+  const hoops = c.rows.filter(r => r.type === 'hoop'), m = Math.max(1, hoops.length)
+  hoops.forEach((g, i) => { const row = h90 + 1 + i
+    for (const [address, value] of Object.entries({ [`I${row}`]: g.paUnit, [`J${row}`]: g.pthUnit, [`L${row}`]: g.pthSum, [`M${row}`]: g.paSum })) set(cy, address, value)
+  })
   for (const [address, value] of Object.entries({
-    [`J${h90 + 1}`]: hoopUnit, [`L${h90 + 1}`]: hoopUnit * input.plan.hoop,
-    [`I${h90 + 5}`]: c.pa, [`J${h90 + 5}`]: c.pth,
-    [`I${h90 + 9}`]: c.spiralThickness, [`J${h90 + 9}`]: c.hoopThickness, [`K${h90 + 9}`]: c.totalThickness,
+    [`I${h90 + m + 4}`]: c.pa, [`J${h90 + m + 4}`]: c.pth,
+    [`I${h90 + m + 8}`]: c.spiralThickness, [`J${h90 + m + 8}`]: c.hoopThickness, [`K${h90 + m + 8}`]: c.totalThickness,
     B17: estimate.cosRef, B18: estimate.tanRef, B20: estimate.hSpiral, B24: estimate.hHoop,
     B27: estimate.nSpiral, B29: estimate.nHoop, B31: estimate.hTotal, B33: estimate.tComposite,
+    C27: input.constraint.preserveCourseSelections ? input.constraint.manualSpiralEstimate ?? initial.spiral : initial.spiral,
+    C29: input.constraint.preserveCourseSelections ? input.constraint.manualHoopEstimate ?? initial.hoop : initial.hoop,
   })) set(cy, address, value)
   sheetNames(res.dome.groups).forEach((name, index) => {
     const ws = wb.Sheets[name], g = res.dome.groups[index]

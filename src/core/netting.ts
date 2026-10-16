@@ -7,7 +7,7 @@
  *   环向层(90°)   pθ90 = tf·σ / R          （纵向贡献 0）
  *   pα = Σ n_i·pαi ≥ pb                   pθ = Σ n_i·pθi + n90·pθ90 ≥ pb
  *   初估：h螺 = R·pb/(2σ·cos²αref)        h环 = (2−tan²αref)·R·pb/(2σ)
- *         n螺 = ⌈h螺/tf⌉                 n环 = ⌈h环/tf⌉
+ *         n螺 = h螺/tf                   n环 = h环/tf（原始小数；选层另取整）
  *   厚度按复材单层厚 tc 计：t = Σn·tc
  *
  * 强度取值口径：螺旋层（含其环向贡献）用 σ_spiral，环向层用 σ_hoop。
@@ -15,6 +15,7 @@
  */
 import type { CylinderResult, CylinderRow, LayupPlan } from './types'
 import { CYLINDER_RAD as RAD } from './course'
+import { activeGroups } from './layup'
 
 export function paUnit(angleDeg: number, tf: number, sigma: number, R: number): number {
   const c = Math.cos(angleDeg * RAD)
@@ -38,12 +39,13 @@ export function initialEstimate(
   tf: number,
   alphaRefDeg: number,
   tc?: number,
+  sigmaHoop = sigma,
 ) {
   const a = alphaRefDeg * RAD
   const cos = Math.cos(a)
   const tan = Math.tan(a)
   const hSpiral = (R * pb) / (2 * sigma * cos * cos)
-  const hHoop = ((2 - tan * tan) * R * pb) / (2 * sigma)
+  const hHoop = ((2 - tan * tan) * R * pb) / (2 * sigmaHoop)
   const hTotal = hSpiral + hHoop
   return {
     alphaRef: alphaRefDeg,
@@ -73,43 +75,30 @@ export function cylinderCheck(plan: LayupPlan, a: CylinderArgs): CylinderResult 
   const rows: CylinderRow[] = []
   // 数组顺序 = 用户给定的缠绕先后顺序，不在此处重排（求和量与顺序无关，但图面与工艺真实性相关）
   // 非激活行（active === false）不参与计算
-  const spiral = plan.spiral.filter((g) => g.active !== false && g.layers > 0 && g.angle > 0 && g.angle < 90)
+  const ordered = activeGroups(plan).filter(g => Number.isFinite(g.angle) && g.angle >= 0 && g.angle <= 90)
 
   let pa = 0
   let pth = 0
   let spiralLayers = 0
+  let hoopLayers = 0
 
-  for (const g of spiral) {
-    const u = paUnit(g.angle, a.tf, a.sigmaSpiral, a.R)
-    const v = pthUnit(g.angle, a.tf, a.sigmaSpiral, a.R)
+  for (const g of ordered) {
+    const sigma = g.type === 'hoop' ? a.sigmaHoop : a.sigmaSpiral
+    const u = g.angle === 90 ? 0 : paUnit(g.angle, a.tf, sigma, a.R)
+    const v = g.angle === 90 ? hoopUnit(a.tf, sigma, a.R) : pthUnit(g.angle, a.tf, sigma, a.R)
     pa += u * g.layers
     pth += v * g.layers
-    spiralLayers += g.layers
+    if (g.type === 'spiral') spiralLayers += g.layers
+    else hoopLayers += g.layers
     rows.push({
       angle: g.angle,
-      type: 'spiral',
+      type: g.type,
       layers: g.layers,
       paUnit: u,
       pthUnit: v,
       paSum: u * g.layers,
       pthSum: v * g.layers,
       thickness: g.layers * a.tc,
-    })
-  }
-
-  const hoopLayers = Math.max(0, plan.hoop)
-  if (hoopLayers > 0) {
-    const v = hoopUnit(a.tf, a.sigmaHoop, a.R)
-    pth += v * hoopLayers
-    rows.push({
-      angle: 90,
-      type: 'hoop',
-      layers: hoopLayers,
-      paUnit: 0,
-      pthUnit: v,
-      paSum: 0,
-      pthSum: v * hoopLayers,
-      thickness: hoopLayers * a.tc,
     })
   }
 
@@ -129,6 +118,6 @@ export function cylinderCheck(plan: LayupPlan, a: CylinderArgs): CylinderResult 
     pthPass: pth >= a.pb,
     paMargin: a.pb > 0 ? pa / a.pb - 1 : Infinity,
     pthMargin: a.pb > 0 ? pth / a.pb - 1 : Infinity,
-    estimate: initialEstimate(a.R, a.pb, a.sigmaSpiral, a.tf, a.alphaRef, a.tc),
+    estimate: initialEstimate(a.R, a.pb, a.sigmaSpiral, a.tf, a.alphaRef, a.tc, a.sigmaHoop),
   }
 }

@@ -254,6 +254,13 @@ describe('测地线角度 ↔ 极孔（§8.3 对照表）', () => {
     expect(checkPoleConsistency(R, 30.13, 10, BAND).level).toBe('ok')
     expect(checkPoleConsistency(R, 45, 10, BAND).level).toBe('warn')
   })
+  it('初始极孔对应约10°时，扩孔后选择20°或45°不要求与起始角相等', () => {
+    expect(checkPoleConsistency(R, 30.13, 20, BAND).level).toBe('ok')
+    expect(checkPoleConsistency(R, 30.13, 45, BAND).level).toBe('ok')
+  })
+  it('小于起始极孔角时只给出简短调整结论', () => {
+    expect(checkPoleConsistency(R, 30.13, .1, BAND)).toMatchObject({ level: 'warn', text: '最小螺旋角过小，请增大角度。' })
+  })
 })
 
 describe('汇总判定、薄弱区定位与对策（runCheck）', () => {

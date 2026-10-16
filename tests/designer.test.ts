@@ -1,106 +1,146 @@
-/**
- * designer.test.ts — 自动铺层方案生成的行为约束
- *
- * 关注三件事：① 生成的方案必须满足筒身双向要求；② 螺旋层成对（偶数）；
- * ③ 不可行时明确报缺口而不是静默给出欠强方案。
- */
 import { describe, expect, it } from 'vitest'
-import { autoDesign, pickAlternate } from '../src/core/designer'
+import { autoDesign, pickAlternate, planPressures } from '../src/core/designer'
 import { runCheck } from '../src/core/checker'
-import { defaultInput, blankInput } from '../src/core/presets'
-import { cylinderCheck } from '../src/core/netting'
-import { deriveParams } from '../src/core/materials'
-import type { DesignInput } from '../src/core/types'
+import { defaultInput, courseInput } from '../src/core/presets'
+import { initialDesign, expandedLayerCounts, selectedLayerCount } from '../src/core/initialDesign'
+import { buildDomeGroup, domeAt, isDomeGroup } from '../src/core/dome'
+import { prepareExpansion } from '../src/core/expansion'
+import { buildWorkbook, workbookBytes } from '../src/export/excel'
+import * as XLSX from 'xlsx'
+import { layupGroups, planFromRows } from '../src/core/layup'
 
-const withPlan = (input: DesignInput, plan: DesignInput['plan']) => ({ ...input, plan })
+const base = defaultInput()
+const generate = (input = base) => {
+  const out = autoDesign(input)
+  if (!out.ok) throw new Error(out.reason)
+  return { out, result: runCheck({ ...input, plan: out.plan }) }
+}
 
-describe('候选角"隔一取一"（课件经验规则）', () => {
-  it('等差序列隔一个抽取，且保留首尾', () => {
-    expect(pickAlternate([10, 12, 15, 17, 20, 25, 30, 37, 40, 45])).toEqual([10, 15, 20, 30, 40, 45])
-    expect(pickAlternate([10, 20])).toEqual([10, 20])
-    expect(pickAlternate([10, 20, 30])).toEqual([10, 20, 30])
+describe('课件单角度初估接入扩孔设计', () => {
+  it('极孔反算约10度，厚度初估仍使用20度，保留原表精确小数', () => {
+    const i = initialDesign(base)
+    expect(i.startAngle).toBeCloseTo(10, 2)
+    expect(i.estimate.alphaRef).toBe(20)
+    expect(i.estimate.nSpiral).toBeCloseTo(14.247551987639529, 10)
+    expect(i.estimate.nHoop).toBeCloseTo(23.49516319968423, 10)
+    expect([i.spiral, i.hoop]).toEqual([16,24])
+    expect(i.pass).toBe(true)
+    expect(i.pa).toBeGreaterThanOrEqual(90)
+    expect(i.pth).toBeGreaterThanOrEqual(90)
+    expect(initialDesign(courseInput()).spiral).toBe(16) // 历史原表手选14不驱动初算
   })
-})
-
-describe('自动生成', () => {
-  const base = blankInput()
-
-  it('从空方案生成满足双向要求的铺层', () => {
-    const out = autoDesign({ ...base, plan: { spiral: [], hoop: 0 } })
-    expect(out.ok).toBe(true)
-    if (!out.ok) return
-    const res = runCheck(withPlan(base, out.plan))
-    expect(res.cylinder.pa).toBeGreaterThanOrEqual(res.derived.pb)
-    expect(res.cylinder.pth).toBeGreaterThanOrEqual(res.derived.pb)
-    expect(out.trace.length).toBeGreaterThan(3)
+  it('角度、爆压、材料和环向强度改变会重算自动初估；扩孔角度不反写初估角', () => {
+    const stronger = { ...base, strength: { ...base.strength, sigmaHoopDirect: 6770 } }
+    expect(initialDesign(stronger).estimate.nHoop).toBeCloseTo(initialDesign(base).estimate.nHoop / 2, 10)
+    expect(initialDesign(stronger).estimate.nSpiral).toBe(initialDesign(base).estimate.nSpiral)
+    const changed = { ...base, constraint: { ...base.constraint, alphaRef: 30 } }
+    expect(initialDesign(changed).spiral).toBeGreaterThan(initialDesign(base).spiral)
+    expect(initialDesign({ ...base, requirement: { ...base.requirement, pb: 180 } }).spiral).toBeGreaterThan(initialDesign(base).spiral)
+    expect(initialDesign({ ...base, material: { ...base.material, tex: .825 } }).estimate.nSpiral).toBeCloseTo(initialDesign(base).estimate.nSpiral * 2, 10)
+    expect(initialDesign({ ...base, constraint: { ...base.constraint, candidates: [15,45,70] } }).estimate).toEqual(initialDesign(base).estimate)
   })
-
-  it('螺旋层保持偶数（±成对）', () => {
-    const out = autoDesign({ ...base, plan: { spiral: [], hoop: 0 } })
-    if (!out.ok) throw new Error(out.reason)
-    expect(out.plan.spiral.every((g) => g.layers % 2 === 0)).toBe(true)
+  it('旧手填初估记录不再影响计算或扩孔；层数只在最终铺层表修改', () => {
+    const input = { ...base, constraint: { ...base.constraint, manualSpiralEstimate: 40, manualHoopEstimate: 32 } }
+    const { out, result } = generate(input)
+    expect(result.cylinder.spiralLayers).toBe(16)
+    expect(result.cylinder.hoopLayers).toBe(24)
+    expect(out.plan.spiral.map(g => g.layers)).toEqual(Array(8).fill(2))
+    expect(out.plan.groups?.map(g => g.type)).toEqual(Array.from({ length:16 }, (_,i) => i%2 ? 'hoop' : 'spiral'))
+    const edited = { ...input, plan: planFromRows(layupGroups(out.plan).map((g,i) => i===0 ? {...g,layers:4} : i===1 ? {...g,layers:6} : g)) }
+    const changed = runCheck(edited)
+    expect(changed.cylinder.spiralLayers).toBe(18)
+    expect(changed.cylinder.hoopLayers).toBe(27)
+    expect(changed.cylinder.pa).toBeGreaterThan(result.cylinder.pa)
+    expect(changed.cylinder.pth).toBeGreaterThan(result.cylinder.pth)
+    expect(initialDesign(edited)).toEqual(initialDesign(input))
   })
-
-  it('关闭偶数约束后允许奇数层，且结果不厚于强制偶数', () => {
-    const even = autoDesign({ ...base, plan: { spiral: [], hoop: 0 } })
-    const free = autoDesign({
-      ...base,
-      constraint: { ...base.constraint, forceEvenSpiral: false },
-      plan: { spiral: [], hoop: 0 },
-    })
-    if (!even.ok || !free.ok) throw new Error('生成失败')
-    const th = (p: DesignInput['plan']) => cylinderCheck(p, {
-      R: base.geometry.R, tf: deriveParams(base).tf, tc: deriveParams(base).tc,
-      sigmaSpiral: deriveParams(base).sigmaSpiral, sigmaHoop: deriveParams(base).sigmaHoop,
-      pb: deriveParams(base).pb, alphaRef: 20,
-    }).totalThickness
-    expect(th(free.plan)).toBeLessThanOrEqual(th(even.plan) + 1e-6)
+  it('8个所选角度需要至少8对；初估不足时明确记录实际16层', () => {
+    const allocation = expandedLayerCounts(base, 8), { out, result } = generate()
+    expect(allocation).toMatchObject({ spiral:16, added:0, layers:Array(8).fill(2) })
+    expect(out.plan.spiral.map(g => g.angle)).toEqual(base.constraint.candidates.map(Math.round))
+    expect(result.cylinder.spiralLayers).toBe(16)
+    const lower = { ...base, requirement: { ...base.requirement, pb:20 } }
+    expect(generate(lower).out.trace.join(' ')).toContain('分配为16层')
+    expect(result.cylinder.hoopLayers).toBe(initialDesign(base).hoop)
   })
-
-  it('生成的方案不会厚于课程手工方案（等强度目标下更省料）', () => {
-    const out = autoDesign({ ...base, plan: { spiral: [], hoop: 0 } })
-    if (!out.ok) throw new Error(out.reason)
-    const auto = runCheck(withPlan(base, out.plan)).cylinder.totalThickness
-    const course = runCheck(defaultInput()).cylinder.totalThickness
-    expect(auto).toBeLessThan(course)
+  it('初算向上取整保证厚度足够；自动螺旋始终按±成对分配', () => {
+    expect([selectedLayerCount(14.24755,true), selectedLayerCount(15,true), selectedLayerCount(23.49516,false)]).toEqual([16,16,24])
+    const data = { ...base, constraint: { ...base.constraint, forceEvenSpiral:false, manualSpiralEstimate:17, manualHoopEstimate:23 } }
+    const { result } = generate(data)
+    expect(result.cylinder.spiralLayers).toBe(16)
+    expect(result.cylinder.hoopLayers).toBe(24)
   })
-
-  it('候选角集为空时明确报错，不返回半成品', () => {
-    const out = autoDesign({
-      ...base,
-      constraint: { ...base.constraint, candidates: [] },
-      plan: { spiral: [], hoop: 0 },
-    })
-    expect(out.ok).toBe(false)
-    if (out.ok) throw new Error('应失败')
-    expect(out.reason).toContain('候选螺旋角集为空')
+  it('扩孔后逐组求解三次样条、逐点厚度和爆压贡献相加；欠强如实返回校核结果', () => {
+    const { out, result } = generate()
+    expect(result.dome.groups).toHaveLength(8)
+    for (const [i,g] of result.dome.groups.entries()) {
+      const direct = buildDomeGroup(out.plan.spiral[i].angle, out.plan.spiral[i].layers, base.geometry.R, result.derived.bandTotal, result.derived.tc)
+      expect(isDomeGroup(direct)).toBe(true)
+      if (!isDomeGroup(direct)) throw new Error('样条求解失败')
+      expect(g).toEqual(direct)
+      expect(g.splineEndRadius).toBe(g.r2b)
+    }
+    const p = domeAt(result.dome.groups, 150, base.geometry.R, result.derived.sigmaComposite, base.requirement.ks)
+    expect(p.tTotal).toBeCloseTo(p.tGroups.reduce((s,n)=>s+n,0), 12)
+    expect(p.pTotal).toBeCloseTo(p.pGroups.reduce((s,n)=>s+n,0)*base.requirement.ks, 12)
+    expect(out.verdict).toBe(result.verdict)
+    expect(result.cylinder.paPass).toBe(false)
+    expect(out.verdict).not.toBe('pass')
+    expect(planPressures(base,out.plan).domeMin).toBe(result.dome.minP)
   })
-
-  it('要求高到角集无法承担时报出缺口方向与数值', () => {
-    const out = autoDesign({
-      ...base,
-      requirement: { ...base.requirement, pbMode: 'direct', pb: 400 },
-      constraint: { ...base.constraint, candidates: [5, 6] },
-      plan: { spiral: [], hoop: 0 },
-    })
-    // 400 MPa 对 5/6° 角集：纵向够但环向几乎为零 → 应判不可行或给出极厚方案
-    if (out.ok) {
-      const res = runCheck(withPlan(base, out.plan))
-      expect(res.cylinder.pa).toBeGreaterThanOrEqual(400)
-      expect(res.cylinder.pth).toBeGreaterThanOrEqual(400)
-    } else {
-      expect(out.reason).toMatch(/缺口|无法同时满足/)
+  it('未选角或无效上游计算角度阻止生成', () => {
+    for (const constraint of [{...base.constraint,candidates:[]}, {...base.constraint,alphaRef:90}]) {
+      expect(autoDesign({ ...base, constraint }).ok).toBe(false)
     }
   })
-
-  it('封头反馈使用课件经验初估，并保留筒身双向约束', () => {
-    const out = autoDesign({ ...base, plan: { spiral: [], hoop: 0 } })
-    if (!out.ok) throw new Error(out.reason)
-    const trace = out.trace.join(' ')
-    const last = runCheck(withPlan(base, out.plan))
-    expect(trace).toMatch(/封头经验初估|封头初估/)
-    expect(trace).not.toMatch(/窗口|固有低载区|预计 min/)
-    expect(last.cylinder.paPass && last.cylinder.pthPass).toBe(true)
-    expect(out.verdict).toBe(last.verdict)
+  it('课件跳选8角，手选4角按上游计算结论分配', () => {
+    expect(pickAlternate(Array.from({length:18},(_,i)=>10+i*3))).toEqual([10,16,22,28,34,40,46,52])
+    const data = prepareExpansion(base)
+    const input = { ...data, constraint: { ...data.constraint, candidates:data.constraint.candidates.slice(0,4), manualSpiralEstimate:14, manualHoopEstimate:24 } }
+    const { out, result } = generate(input)
+    expect(out.plan.spiral.map(g=>g.layers)).toEqual([4,4,4,4])
+    expect(result.cylinder.spiralLayers).toBe(16)
+    expect(result.cylinder.hoopLayers).toBe(24)
+  })
+  it('Excel 初算区向上取整，不受旧手填值影响；逐角度贡献与软件一致', async () => {
+    for (const data of [base, { ...base, constraint: { ...base.constraint, manualSpiralEstimate:40, manualHoopEstimate:32 } }]) {
+      const { out, result } = generate(data), input = { ...data, plan:out.plan }
+      const raw = buildWorkbook(input,result).Sheets['筒身强度设计与计算']
+      expect(raw.C27.v).toBe(initialDesign(data).spiral)
+      expect(raw.C29.v).toBe(initialDesign(data).hoop)
+      expect(raw.C27.f).toContain('ROUNDUP(B27/2,0)')
+      const book = XLSX.read(await workbookBytes(input,result),{type:'array'})
+      expect(book.Sheets['方案汇总'].B8.v).toBeCloseTo(result.cylinder.pa,10)
+      expect(book.Sheets['方案汇总'].B9.v).toBeCloseTo(result.cylinder.pth,10)
+      expect(book.SheetNames.filter(n=>n.startsWith('封头-'))).toHaveLength(8)
+    }
+  },15000)
+  it('多组材料、压力和计算角度下，上游单角度结论均满足双向设计爆压', () => {
+    for (const pb of [20,90,196]) for (const alphaRef of [10,20,30,45]) {
+      const data = { ...base, requirement: { ...base.requirement, pb }, constraint: { ...base.constraint, alphaRef },
+        strength: { ...base.strength, sigmaHoopDirect: 4000 } }
+      const initial = initialDesign(data)
+      expect(initial.pass,`${pb}MPa / ${alphaRef}°`).toBe(true)
+      expect(initial.spiral%2).toBe(0)
+      expect(initial.pa).toBeGreaterThanOrEqual(pb)
+      expect(initial.pth).toBeGreaterThanOrEqual(pb)
+    }
+  })
+  it('无效的上游压力、角度或几何不会显示初算满足', () => {
+    for(const data of [
+      {...base, requirement:{...base.requirement,pb:0}},
+      {...base, material:{...base.material,vf:0}},
+      {...base, geometry:{...base.geometry,r0Winding:200}},
+      {...base, constraint:{...base.constraint,alphaRef:90}},
+    ]) expect(initialDesign(data).pass).toBe(false)
+  })
+  it('实际填入角度四舍五入为整度，封头模型和导出使用取整后的真实角度', () => {
+    const data = {...base,constraint:{...base.constraint,candidates:[10.001,16.794,23.841,48.593]}}
+    const {out,result} = generate(data)
+    expect(out.plan.spiral.map(g=>g.angle)).toEqual([10,17,24,49])
+    expect(result.dome.groups.map(g=>g.angle)).toEqual([10,17,24,49])
+    expect(result.dome.groups[0].r0).toBeCloseTo(30.127958825212414,10)
+    expect(buildWorkbook({...data,plan:out.plan},result).SheetNames).toContain('封头-10°')
+    expect(autoDesign({...data,constraint:{...data.constraint,candidates:[.4,89.6]}}).ok).toBe(false)
   })
 })

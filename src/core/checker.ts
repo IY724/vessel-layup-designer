@@ -15,10 +15,11 @@ import { deriveParams } from './materials'
 import { cylinderCheck } from './netting'
 import { buildDomeGroups, domeCheck } from './dome'
 import { checkPoleConsistency, poleRadius } from './geodesic'
+import { activeGroups, hoopGroups, spiralGroups, transferHoop } from './layup'
 
 /** 原表半径列起点；不采用自定的强度检查截断区。 */
 export function effectiveRBoss(input: DesignInput): number {
-  const r0s = input.plan.spiral
+  const r0s = spiralGroups(input.plan)
     .filter((g) => g.active !== false && g.layers > 0 && g.angle < 90)
     .map((g) => poleRadius(input.geometry.R, g.angle))
   // 原表完整半径列参与汇总，不另设软件自定的强度判定截断区。
@@ -82,7 +83,7 @@ export function evaluatePlan(input: DesignInput): PlanEvaluation {
     alphaRef: constraint.alphaRef,
   })
 
-  const { groups, failed } = buildDomeGroups(plan.spiral, R, derived.bandTotal, derived.tc)
+  const { groups, failed } = buildDomeGroups(spiralGroups(plan), R, derived.bandTotal, derived.tc)
   const rBoss = effectiveRBoss(input)
   const dome = domeCheck(
     groups,
@@ -99,7 +100,7 @@ export function evaluatePlan(input: DesignInput): PlanEvaluation {
   )
   // 课件第六课第 2 页：h_fα 为纯纤维厚度，α₀ 为筒身角。
   // 多组逐项求和与筒身纵向贡献相同，仅再乘 ks；不用局部 K 或独立 σc。
-  const pressure = requirement.ks * cylinder.pa
+  const pressure = requirement.ks * cylinder.rows.filter(g => g.type === 'spiral').reduce((s, g) => s + g.paSum, 0)
   const head = { pressure, pass: pressure >= derived.pb }
   return { derived, cylinder, dome, head, rBoss }
 }
@@ -126,7 +127,12 @@ export function runCheck(input: DesignInput): CheckResult {
   )
 
   // ---- 诊断 ----
-  const angles = plan.spiral.filter((g) => g.active !== false && g.layers > 0).map((g) => g.angle)
+  const angles = spiralGroups(plan).filter((g) => g.active !== false && g.layers > 0 && g.angle > 0 && g.angle < 90).map((g) => g.angle)
+  for (const g of activeGroups(plan)) {
+    if (!Number.isFinite(g.angle) || g.angle < 0 || g.angle > 90 || (g.type === 'spiral' && (g.angle <= 0 || g.angle >= 90))) {
+      diagnoses.push({ level: 'error', text: `${g.type === 'spiral' ? '螺旋' : '环向'}角度 ${g.angle}° 无效：螺旋应在0°与90°之间，环向可取0°至90°。` })
+    }
+  }
   if (angles.length) {
     const chk = checkPoleConsistency(R, derived.r0, Math.min(...angles), derived.bandTotal)
     diagnoses.push({ level: chk.level, text: chk.text })
@@ -156,7 +162,7 @@ export function runCheck(input: DesignInput): CheckResult {
     diagnoses.push({ level: 'error', text: f.reason })
   }
 
-  const verdict: CheckResult['verdict'] = !cylinder.paPass || !cylinder.pthPass
+  const verdict: CheckResult['verdict'] = diagnoses.some(d => d.level === 'error') || !cylinder.paPass || !cylinder.pthPass
     ? 'fail'
     : head.pass
       ? 'pass'
@@ -181,15 +187,11 @@ export function suggestHoopSwap(
     opts.targetAngle ??
     Math.max(
       ...input.constraint.candidates,
-      ...(input.plan.spiral.length ? input.plan.spiral.map((g) => g.angle) : [0]),
+      ...spiralGroups(input.plan).filter(g => g.active !== false).map((g) => g.angle),
     )
   for (let k = 2; k <= maxT; k += 2) {
-    if (input.plan.hoop < k) break
-    const spiral = input.plan.spiral.map((g) => ({ ...g }))
-    const hit = spiral.find((g) => Math.abs(g.angle - target) < 1e-9)
-    if (hit) hit.layers += k
-    else spiral.push({ angle: target, layers: k })
-    const variant: DesignInput = { ...input, plan: { spiral, hoop: input.plan.hoop - k } }
+    if (hoopGroups(input.plan).reduce((s, g) => s + g.layers, 0) < k || !(target > 0 && target < 90)) break
+    const variant: DesignInput = { ...input, plan: transferHoop(input.plan, k, target) }
     const res = evaluatePlan(variant)
     const last = res.dome.profile[res.dome.profile.length - 1]
     out.push({

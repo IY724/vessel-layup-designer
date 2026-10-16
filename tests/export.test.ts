@@ -6,9 +6,9 @@ import { compareCourse, courseReference } from '../src/export/courseComparison'
 import { FORMULAS } from '../src/core/excelRef'
 import images from '../src/export/formulaImages.json'
 import { runCheck } from '../src/core/checker'
-import { defaultInput } from '../src/core/presets'
+import { courseInput } from '../src/core/presets'
 
-const input=defaultInput(),res=runCheck(input),raw=buildWorkbook(input,res)
+const input=courseInput(),res=runCheck(input),raw=buildWorkbook(input,res)
 
 describe('课件原表逐格核对',()=>{
   it('5990 个基准值保留，平方项与独立修正基准一致',()=>{
@@ -81,6 +81,7 @@ describe('实际导出文件',()=>{
     expect(angle.getCell('A30').formula).toBe('INDEX(MINVERSE($A$23:$D$26),1,1)')
     expect(angle.getCell('G30').formula).toBe('SUM(A30*E23,B30*E24,C30*E25,D30*E26)')
     expect(angle.getCell('H41').formula).toContain('COS(G41/180*PI())^2')
+    expect(angle.getCell('A40').value).toBe('平行圆半径\nmm')
     expect(angle.views[0].showGridLines).toBe(true)
     expect(angle.pageSetup.printTitlesRow).toBe('40:40')
     expect(angle.getCell('C6').fill).toMatchObject({fgColor:{argb:'FFF3D4'}})

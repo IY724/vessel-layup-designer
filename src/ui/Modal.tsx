@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 // 避免 Chromium 里 sticky 表头越过 position:fixed 弹窗重绘（会“透出来”盖住弹窗内容）。
 let openCount = 0
 
-export function Modal(props: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; narrow?: boolean }) {
+export function Modal(props: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; narrow?: boolean; className?: string }) {
   useEffect(() => {
     openCount += 1
     document.body.classList.add('modal-open')
@@ -21,7 +21,7 @@ export function Modal(props: { title: string; onClose: () => void; children: Rea
   return (
     <div className="modal" onClick={props.onClose}>
       <div
-        className={`box${props.narrow ? ' narrow' : ''}`}
+        className={`box${props.narrow ? ' narrow' : ''}${props.className ? ` ${props.className}` : ''}`}
         onClick={(e) => e.stopPropagation()}
         style={props.wide ? { width: 'min(1500px, 98%)' } : undefined}
       >

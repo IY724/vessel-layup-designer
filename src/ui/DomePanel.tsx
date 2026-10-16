@@ -158,7 +158,7 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
   /** 图例条目：内衬 + 各角度组，按画布宽换行，最后一行贴着画布底边 */
   const legend: Array<{ label: string; color: string }> = [
     { label: '内衬', color: '#94a3b8' },
-    ...groups.map((gr, i) => ({ label: `${gr.angle}°×${gr.layers} 层`, color: angleColor(gr.angle, i) })),
+    ...groups.map((gr, i) => ({ label: `${Number(gr.angle.toFixed(2))}°×${gr.layers} 层`, color: angleColor(gr.angle, i) })),
   ]
   const legendTop = VH - 10 - (g.legendRows - 1) * 13
 
@@ -168,16 +168,16 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
       <path d={g.inner} fill="none" stroke="#94a3b8" strokeWidth="1.2" />
       {/* 各角度组外表面轮廓线（按缠绕先后堆叠，最后一组为最外层） */}
       {o.layers &&
-        g.layers.map((l) => <path key={l.angle} d={l.d} fill="none" stroke={l.color} strokeWidth="1.3" />)}
+        g.layers.map((l, i) => <path key={i} d={l.d} fill="none" stroke={l.color} strokeWidth="1.3" />)}
       {/* 起铺点：该组开始铺到的平行圆 */}
       {o.r0Marks &&
-        g.marks.map((mk) => (
-          <circle key={`r0-${mk.angle}`} cx={mk.r0[0]} cy={mk.r0[1]} r="2.8" fill="#fff" stroke={mk.color} strokeWidth="1.4" />
+        g.marks.map((mk, i) => (
+          <circle key={`r0-${i}`} cx={mk.r0[0]} cy={mk.r0[1]} r="2.8" fill="#fff" stroke={mk.color} strokeWidth="1.4" />
         ))}
       {/* 样条 → 覆盖公式的衔接点 */}
       {o.r2bMarks &&
-        g.marks.filter((mk) => mk.r2b).map((mk) => (
-          <g key={`r2b-${mk.angle}`}>
+        g.marks.filter((mk) => mk.r2b).map((mk, i) => (
+          <g key={`r2b-${i}`}>
             <rect x={mk.r2b![0] - 2.2} y={mk.r2b![1] - 2.2} width="4.4" height="4.4" fill="#fff" stroke={mk.color} strokeWidth="1.3" />
           </g>
         ))}
@@ -290,10 +290,6 @@ export function PressureChart(props: {
         目标爆压 {n(pb, 1)}
       </text>
       <path d={curve} fill="none" stroke="#b91c1c" strokeWidth="2.4" strokeLinejoin="round" />
-      <circle cx={X(dome.minPR)} cy={Y(dome.minP)} r="4" fill="#fff" stroke="#b91c1c" strokeWidth="2" />
-      <text x={X(dome.minPR)} y={Y(dome.minP) - 10} fontSize="10" fill="#b91c1c" textAnchor="middle">
-        最低 {n(dome.minP, 1)} @ r≈{n(dome.minPR, 0)}
-      </text>
       <circle cx={X(R)} cy={Y(prof.length ? prof[prof.length - 1].pTotal : 0)} r="3" fill="#b91c1c" />
       {hp && (
         <g>
@@ -312,7 +308,7 @@ export function PressureChart(props: {
             </text>
             {hp.pGroups.map((p, i) => (
               <text key={i} x="8" y={54 + i * 11} fontSize="9.5" fill={angleColor(dome.groups[i].angle, i)}>
-                {dome.groups[i].angle}°：厚 {n(hp.tGroups[i], 3)} mm、爆压 {n(p, 1)} MPa
+                {Number(dome.groups[i].angle.toFixed(2))}°：厚 {n(hp.tGroups[i], 3)} mm、爆压 {n(p, 1)} MPa
               </text>
             ))}
           </g>
@@ -328,7 +324,7 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
   return (
     <div className="card">
       <h3>
-        封头厚度与局部参考曲线
+        封头厚度与爆压分布
         <span className="tail">{sym(`平衡系数 k_s = ${input.requirement.ks}`)}</span>
       </h3>
       <div className="dome">
@@ -366,9 +362,8 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
           </div>
         </div>
         <div className="pane">
-          <h4>局部参考爆压分布</h4>
+          <h4>封头爆破压强分布</h4>
           <div className="sub">
-            局部角 K；经验初估另用筒身角 α₀
             <FormulaHelp
               title="封头爆破压强公式"
               items={[
