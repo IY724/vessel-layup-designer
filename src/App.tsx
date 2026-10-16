@@ -84,7 +84,7 @@ export default function App() {
           <Overview result={result} input={input} />
           <CylinderPanel store={store} onAuto={() => setAuto(true)} />
           <DomePanel input={input} result={result} onExpand={(w) => setExpand(w)} />
-          <GeometryPanel input={input} result={result} />
+          <GeometryPanel input={input} result={result} onGeometry={store.setGeometry} />
         </div>
       </div>
 

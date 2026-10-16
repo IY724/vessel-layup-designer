@@ -1,9 +1,10 @@
 /**
  * LineTypeDesigner.tsx — 线型切点设计（论文设计顺序的可视化）
  *
- * 已知容积 V（硬约束）→ 导出光滑曲线 Φ = f(D)（Φ = 双程转角 θ_n）→ 把线型表允许的
- * 转角画成水平横线切过去 → 交点即候选方案（外径 D 与筒身长 l 同时确定）→ 用户照表
- * 自己挑（**不排序、不推荐**）。选定某档的一刻，内胆几何与数控速比参数一起定型。
+ * 已知目标容积 V（硬约束，此处显式输入）→ 导出光滑曲线 Φ = f(D)（Φ = 芯模转角 θ_n）→
+ * 把线型表允许的转角画成水平横线切过去 → 交点即候选方案（筒身直径 D 与筒身长 l 同时
+ * 确定）→ 用户照表自己挑（**不排序、不推荐**）。选定某档的一刻，内胆几何与数控速比
+ * 参数一起定型。
  *
  * 纯展示 + 回填回调；计算全在 core/geometry.ts 的纯函数里（designCurve / solveForTheta /
  * intersectLineTypes / allowedLineTypes），与铺层/封头内核同口径。
@@ -17,16 +18,19 @@ import {
   type DesignBase,
   type LineTypeCandidate,
 } from '../core/geometry'
+import { Num } from './fields'
 
 const f = (v: number, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—')
 
 export interface LineTypeDesignerProps {
   base: DesignBase
-  /** 目标容积 (L) */
+  /** 目标容积 (L)：设计指标，直接读写几何参数 */
   volumeL: number
-  /** 当前锁定的外径 D (mm)，用于高亮；缺省不高亮 */
+  /** 当前锁定的筒身直径 D (mm)，用于高亮；缺省不高亮 */
   currentD?: number
-  /** 采用某个候选：把 (D, l) 回填到几何输入 */
+  /** 修改目标容积（写回设计输入） */
+  onVolume: (v: number) => void
+  /** 采用某个候选：把筒身直径 D 与筒身长 l 写回设计输入 */
   onApply: (p: { D: number; R: number; l: number; theta: number }) => void
   /** 允许转角窗口（默认 450~660°，切点数 ≤ 4） */
   thetaLow?: number
@@ -115,7 +119,7 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
           <line x1={ml} y1={mt} x2={ml} y2={H - mb} stroke="#cbd5e1" />
           <line x1={ml} y1={H - mb} x2={W - mr} y2={H - mb} stroke="#cbd5e1" />
           <text x={W - mr} y={H - mb + 26} fontSize="9" fill="#64748b" textAnchor="end">
-            外径 D (mm)
+            筒身直径 D (mm)
           </text>
           <text x={ml - 40} y={mt + 2} fontSize="9" fill="#64748b">
             芯模转角 θ′n
@@ -174,13 +178,14 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
 
       <div className="pane">
         <h4>候选方案（交点）</h4>
-        <div className="sub">选好档位点「采用」回填 D 与 l。</div>
+        <Num label="目标容积 V（设计指标）" value={props.volumeL} unit="L" step={1} onChange={(v) => v !== null && v > 0 && props.onVolume(v)} />
+        <div className="sub">选好档位点「采用」，把筒身直径与筒身长写回几何参数。</div>
         <div className="tablewrap" style={{ maxHeight: 250 }}>
           <table className="grid">
             <thead>
               <tr>
                 <th>转角 θ</th>
-                <th>外径 D</th>
+                <th>筒身直径 D</th>
                 <th>筒身长 l</th>
                 <th>长径比 l/D</th>
                 <th>切点数 n</th>
@@ -210,7 +215,7 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
                     <button
                       className="btn sm"
                       onClick={() => onApply({ D: c.D, R: c.R, l: c.l, theta: c.theta })}
-                      title="把该档的外径与筒身长回填到几何输入"
+                      title="把该档的筒身直径与筒身长写回几何参数"
                     >
                       采用
                     </button>

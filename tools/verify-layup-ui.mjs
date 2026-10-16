@@ -211,6 +211,22 @@ try {
   assert.equal((await read()).plan.groups[0].angle,10)
   assert.ok((await read()).plan.groups.every(g=>Number.isInteger(g.angle)))
   await page.screenshot({ path: path.join(out, '默认8角度-交叉铺层.png') })
+  // ②「采用」写回几何参数：左侧筒身段长度跟随，① 标注来源；轮廓含筒身段
+  const vField = lineCard.locator('.field').filter({ hasText: '目标容积' }).locator('input')
+  assert.equal(await vField.count(), 1, '② 缺少显式目标容积输入')
+  const lInput = page.locator('.inputs .field:not(.wide)').filter({ hasText: '筒身段长度' }).locator('input')
+  const firstRow = lineCard.locator('tbody tr').first()
+  const lExpect = Number.parseFloat(await firstRow.locator('td').nth(2).innerText())
+  await firstRow.getByRole('button', { name: '采用', exact: true }).click()
+  const lAfter = Number.parseFloat(await lInput.inputValue())
+  assert.ok(Math.abs(lAfter - lExpect) < 0.11, `采用未写回筒身段长度（候选 ${lExpect}，实际 ${lAfter}）`)
+  const geoCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: /容积与尺寸互算/ }) })
+  assert.ok((await geoCard.locator('.src').filter({ hasText: '②采用' }).count()) >= 1, '① 未标注「②采用」来源')
+  assert.ok(
+    (await page.locator('svg[aria-label="封头厚度几何轮廓"]').getByText('筒身段', { exact: true }).count()) >= 1,
+    '封头轮廓未画出筒身段',
+  )
+  await page.screenshot({ path: path.join(out, '线型采用-写回几何.png') })
   assert.deepEqual(failures, [])
   const report = { target: desktopPath ?? page.url(), checks: ['类型切换', '环向默认90度且可修改', '环向85度多组', '两类铺层实际鼠标拖动', '停用与恢复', '重新加载保留顺序与数值', '候选表3列无来源说明', '空选阻止生成', '手选四角完整保留', '默认跳选8角完整保留', '候选含45度以上', '无上下箭头和分段设置', '一行增加铺层建议', '概览无局部/赤道中间值', '多位输入保持焦点', '总带宽随单束带宽及束数变化并重算候选', '极孔提示一句结论且允许更大的扩孔角'], rendererErrors: failures, saved: await read(), checkedAt: new Date().toISOString() }
   report.checks.push('初算角度只在前面的筒身计算输入', '初算层数为只读计算结论', '上游参数变化自动重算结论', '扩孔窗口只选角不重复参数', '最终铺层表可改层数且不反写初算结论')
@@ -219,6 +235,7 @@ try {
   report.checks.push('封头厚度分布与爆压分布可切换，厚度读数含总厚与筒身参考')
   report.checks.push('初估角说明弹窗含经验取法 23°/极孔角+10°')
   report.checks.push('长径比超经验区间标黄，线型表进线型弹窗')
+  report.checks.push('②显式目标容积，采用写回几何参数并标注来源，封头轮廓含筒身段')
   await writeFile(path.join(out, 'verification.json'), JSON.stringify(report, null, 2))
   console.log(JSON.stringify({ target: report.target, passed: report.checks.length, rendererErrors: failures, report: path.join(out, 'verification.json') }))
 } catch (error) {

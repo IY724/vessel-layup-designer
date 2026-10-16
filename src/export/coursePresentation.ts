@@ -4,7 +4,7 @@ import type { CheckResult, DesignInput } from '../core/types'
 import { activeGroups, layupGroups } from '../core/layup'
 import { initialDesign } from '../core/initialDesign'
 import { expansionAngles } from '../core/expansion'
-import { allowedLineTypes, computeVolume, intersectLineTypes, lambdaFromDepth, windingTurns, type VolumeParams } from '../core/geometry'
+import { allowedLineTypes, intersectLineTypes, lambdaFromDepth, windingTurns, type VolumeParams } from '../core/geometry'
 import images from './formulaImages.json'
 import linetableRef from '../assets/linetableRef.json'
 import { addNativeCharts, type NativeChart } from './nativeCharts'
@@ -241,13 +241,14 @@ function lineTypeSheet(ws:Sheet,data:DesignInput,res:CheckResult):number{
   base(ws,[26,20,20,18,16,16,14,16],4);title(ws,'线型切点设计','H')
   const R=data.geometry.R,hAxis=data.geometry.headShortAxis||R
   const vp:VolumeParams={R_in:R,l:data.geometry.cylLength,lambda:lambdaFromDepth(R,hAxis),r0:res.derived.r0,Kf:0.8}
-  const vol=computeVolume(vp),turns=windingTurns(vp)
-  const candidates=intersectLineTypes({lambda:vp.lambda,r0:vp.r0,Kf:vp.Kf},vol.totalL,allowedLineTypes(450,660,4))
+  const turns=windingTurns(vp)
+  // 候选与切线图都按显式目标容积（设计指标）取，与界面 ② 同口径
+  const candidates=intersectLineTypes({lambda:vp.lambda,r0:vp.r0,Kf:vp.Kf},data.geometry.volumeL,allowedLineTypes(450,660,4))
   const currentD=2*R
   section(ws,4,'设计条件','A','D');rows(ws,5,[
     ['项目','数值','单位'],
-    ['目标容积 V',Number(vol.totalL.toFixed(3)),'L'],
-    ['筒身内半径 R_in',R,'mm'],
+    ['目标容积 V',Number(data.geometry.volumeL.toFixed(3)),'L'],
+    ['筒身段半径 R',R,'mm'],
     ['封头轴比 λ',Number(vp.lambda.toFixed(3)),''],
     ['极孔半径 r0',vp.r0,'mm'],
     ['筒身段长度 l',vp.l,'mm'],
@@ -265,17 +266,15 @@ function lineTypeSheet(ws:Sheet,data:DesignInput,res:CheckResult):number{
   const list=candidates.length?candidates.map(c=>[
     live(`360*(${c.m}+${c.K}/${c.n})`,c.theta),Number(c.D.toFixed(2)),Number(c.l.toFixed(1)),Number(c.ratio.toFixed(3)),c.n,`${c.K} / ${c.m}`,Math.abs(c.D-currentD)<1.5?'是':'—',
   ]):[['无交点：请调整容积 / 轴比 / 极孔','','','','','','']]
-  rows(ws,22,[['转角 θ / °','外径 D / mm','筒身段长 l / mm','长径比 l/D','切点数 n','K / m','采用'],...list])
+  rows(ws,22,[['转角 θ / °','筒身直径 D / mm','筒身段长 l / mm','长径比 l/D','切点数 n','K / m','采用'],...list])
   const noteRow=23+list.length
   text(ws,`A${noteRow}:G${noteRow}`,'θ = 360°·(m + K/n)：n 为切点数，K、m 为整数（K 与 n 互质）。',10)
   const imgRow=noteRow+2
   // 表2-1 纤维缠绕线型表：原表插图（郑强 2008 p14，含切点数纵向合并与各格斜线），
-  // 与界面弹窗共用同一张图；图体在 writePresentation 中嵌入，此处只留表下注与打印区域。
-  // 插图整张放在新的一页，避免打印/导出 PDF 时被分页切断。
+  // 与界面弹窗共用同一张图；图体在 writePresentation 中嵌入。插图整张放在新的一页，
+  // 避免打印/导出 PDF 时被分页切断；图下不加注释（用户明确此类注解都不要）。
   ws.getRow(imgRow+LT_IMG.top-1).addPageBreak()
-  const ltNoteRow=imgRow+LT_IMG.top+LT_IMG_ROWS+1
-  text(ws,`A${ltNoteRow}:H${ltNoteRow}`,'注：n ≤ 4、450°~660° 为软件初选窗口；长径比经验区间 2~5（朱宁 2023）用于初选外形；线型表出自郑强（2008）。',10)
-  ws.pageSetup.printArea=`A1:H${ltNoteRow+1}`
+  ws.pageSetup.printArea=`A1:H${imgRow+LT_IMG.top+LT_IMG_ROWS}`
   return imgRow
 }
 

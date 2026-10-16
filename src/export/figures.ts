@@ -8,15 +8,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CheckResult, DesignInput } from '../core/types'
 import { DomeContour } from '../ui/DomePanel'
-import {
-  allowedLineTypes,
-  computeVolume,
-  designCurve,
-  intersectLineTypes,
-  lambdaFromDepth,
-  solveForTheta,
-  type VolumeParams,
-} from '../core/geometry'
+import { allowedLineTypes, designCurve, intersectLineTypes, lambdaFromDepth, solveForTheta } from '../core/geometry'
 
 export interface Figure {
   base64: string
@@ -66,16 +58,11 @@ export async function domeContourFigure(input: DesignInput, result: CheckResult,
 export async function lineTypeFigure(input: DesignInput, result: CheckResult, W = 720, H = 380): Promise<Figure> {
   const R = input.geometry.R
   const hAxis = input.geometry.headShortAxis || R
-  const vp: VolumeParams = {
-    R_in: R,
-    l: input.geometry.cylLength,
-    lambda: lambdaFromDepth(R, hAxis),
-    r0: result.derived.r0,
-    Kf: 0.8,
-  }
-  const vol = computeVolume(vp)
+  // 与界面 ② 同口径：候选与曲线都按显式目标容积（设计指标）取
+  const targetL = input.geometry.volumeL
+  const base = { lambda: lambdaFromDepth(R, hAxis), r0: result.derived.r0, Kf: 0.8 }
   const allowed = allowedLineTypes(450, 660, 4)
-  const candidates = intersectLineTypes({ lambda: vp.lambda, r0: vp.r0, Kf: vp.Kf }, vol.totalL, allowed)
+  const candidates = intersectLineTypes(base, targetL, allowed)
   const currentD = 2 * R
 
   const mt = 20
@@ -89,18 +76,18 @@ export async function lineTypeFigure(input: DesignInput, result: CheckResult, W 
   const thetaBot = (thetas.length ? Math.min(...thetas) : 450) * 0.96
   let dMin = 0
   let dMax = 0
-  const hi = solveForTheta({ lambda: vp.lambda, r0: vp.r0, Kf: vp.Kf }, vol.totalL, thetaTop)
-  const lo = solveForTheta({ lambda: vp.lambda, r0: vp.r0, Kf: vp.Kf }, vol.totalL, thetaBot)
+  const hi = solveForTheta(base, targetL, thetaTop)
+  const lo = solveForTheta(base, targetL, thetaBot)
   if (hi.ok) dMin = hi.D
   if (lo.ok) dMax = lo.D
   if (!(dMax > dMin)) {
-    const c = designCurve({ lambda: vp.lambda, r0: vp.r0, Kf: vp.Kf }, vol.totalL, { samples: 10 })
+    const c = designCurve(base, targetL, { samples: 10 })
     if (c.length) {
       dMin = c[c.length - 1].D
       dMax = c[0].D
     }
   }
-  const curve = designCurve({ lambda: vp.lambda, r0: vp.r0, Kf: vp.Kf }, vol.totalL, { dMin, dMax, samples: 140 })
+  const curve = designCurve(base, targetL, { dMin, dMax, samples: 140 })
   const X = (D: number) => ml + ((D - dMin) / Math.max(1e-9, dMax - dMin)) * plotW
   const Y = (theta: number) => mt + ((thetaTop - theta) / Math.max(1e-9, thetaTop - thetaBot)) * plotH
 
@@ -117,7 +104,7 @@ export async function lineTypeFigure(input: DesignInput, result: CheckResult, W 
   }
   el.push(`<line x1="${ml}" y1="${mt}" x2="${ml}" y2="${H - mb}" stroke="#cbd5e1"/>`)
   el.push(`<line x1="${ml}" y1="${H - mb}" x2="${W - mr}" y2="${H - mb}" stroke="#cbd5e1"/>`)
-  el.push(`<text x="${W - mr}" y="${H - mb + 28}" font-size="10" fill="#64748b" text-anchor="end">外径 D (mm)</text>`)
+  el.push(`<text x="${W - mr}" y="${H - mb + 28}" font-size="10" fill="#64748b" text-anchor="end">筒身直径 D (mm)</text>`)
   el.push(`<text x="${ml - 46}" y="${mt + 2}" font-size="10" fill="#64748b">芯模转角 θ′n</text>`)
   for (const c of candidates) {
     const near = Math.abs(c.D - currentD) < 1.5

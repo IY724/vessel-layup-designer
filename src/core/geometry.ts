@@ -24,7 +24,7 @@ import { DEG, RAD } from './geodesic'
 const clamp1 = (x: number) => Math.max(-1, Math.min(1, x))
 
 export interface VolumeParams {
-  /** 筒身内半径 R_in (mm) = D/2 − t */
+  /** 筒身段半径 R_in (mm)（Excel 口径：与铺层设计 R 同值，容积按此半径计） */
   R_in: number
   /** 筒身段长度 l (mm) */
   l: number
@@ -105,9 +105,9 @@ export function solveGeometry(
   if (unknown === 'R_in') {
     const f = (R: number) => computeVolume({ ...p, R_in: R }).totalMm3 - targetMm3
     const root = bisect(f, 1, 2000)
-    if (root === null) return { params: p, parts: computeVolume(p), solved: '筒身内半径无解（目标容积过小或过大）', ok: false }
+    if (root === null) return { params: p, parts: computeVolume(p), solved: '筒身段半径无解（目标容积过小或过大）', ok: false }
     const params = { ...p, R_in: root }
-    return { params, parts: computeVolume(params), solved: `筒身内半径 R_in = ${root.toFixed(2)} mm（D = ${(2 * root).toFixed(1)} mm）`, ok: true }
+    return { params, parts: computeVolume(params), solved: `筒身段半径 R = ${root.toFixed(2)} mm（筒身直径 D = ${(2 * root).toFixed(1)} mm）`, ok: true }
   }
   // lambda：b = R/λ，λ↑ → 封头变浅 → 容积单调减
   const f = (lam: number) => computeVolume({ ...p, lambda: lam }).totalMm3 - targetMm3

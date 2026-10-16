@@ -39,7 +39,7 @@ export function InputPanel({ store }: { store: DesignStore }) {
             title="几何与极孔公式"
             items={[
               { frm: 'r_0=R\\sin\\alpha', desc: 'α 为极孔处的测地线角' },
-              { frm: 'b=\\dfrac{R_{in}}{\\lambda}', desc: 'λ 为封头轴比（λ=2 为标准椭圆封头）' },
+              { frm: 'b=\\dfrac{R}{\\lambda}', desc: 'R 为筒身段半径；λ 为封头轴比（λ=2 为标准椭圆封头）' },
             ]}
           />
         }

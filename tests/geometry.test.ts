@@ -83,7 +83,7 @@ describe('容积↔尺寸互算', () => {
     expect(out.params.l).toBeGreaterThan(1000)
     expect(computeVolume(out.params).totalL).toBeCloseTo(78, 6)
   })
-  it('反算筒身内半径 R_in 后再正算，回到目标容积', () => {
+  it('反算筒身段半径 R 后再正算，回到目标容积', () => {
     const out = solveGeometry({ ...ZHU, l: 1282 }, 'R_in', 80)
     expect(out.ok).toBe(true)
     expect(out.params.R_in).toBeGreaterThan(ZHU.R_in)

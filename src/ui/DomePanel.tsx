@@ -32,14 +32,15 @@ interface Geom {
   xCylEnd: number
   /** 旋转轴（水平置底）y */
   axisY: number
-  /** 参考面（缠绕层内表面）轮廓 */
+  /** 参考面（缠绕层内表面）轮廓（含筒身段直段） */
   outer: string
-  /** 内衬内表面 */
+  /** 内衬内表面（含筒身段直段） */
   inner: string
+  /** 各角度组轮廓线（含筒身段直段） */
   layers: Array<{ angle: number; color: string; d: string }>
   boss: { x: number; y: number; w: number; h: number }
-  /** 筒身段三条壁厚线（参考面 / 螺旋层外 / 总厚外）的 y */
-  wallYs: number[]
+  /** 筒身段最外层轮廓线 y（用于"筒身段"标注） */
+  cylTopY: number
   peakTotal: { t: number; r: number; x: number; y: number }
   /** 每组的 r0g（该组开始铺到的平行圆）与 r2b（样条→覆盖切换点）在图上的位置 */
   marks: Array<{ angle: number; color: string; r0: [number, number]; r2b: [number, number] | null }>
@@ -56,8 +57,6 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
   const R = input.geometry.R
   const hAxis = input.geometry.headShortAxis || R
   const groups = result.dome.groups
-  const wall = result.cylinder.totalThickness
-  const spiralThk = result.cylinder.spiralThickness
   const liner = input.geometry.linerThickness || 3
   const prof = result.dome.profile
   const rStart = prof.length ? prof[0].r : R * 0.2
@@ -73,7 +72,9 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
   const x0 = Math.max(pad, (W - hAxis * sc) / 2)
   const axisY = top + (R + maxT + 4) * sc
   const xEq = x0 + hAxis * sc
-  const xCylEnd = xEq
+  // 筒身段示意直段：赤道向右延伸（画布余量内），画螺旋/环向壁厚带
+  const cylPx = Math.max(0, Math.min(240, hAxis * sc * 0.6, W - pad - xEq - 2))
+  const xCylEnd = xEq + cylPx
   const usedW = W
   const usedH = H
 
@@ -93,8 +94,10 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
   const path = (pts: Array<[number, number]>) => 'M' + pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' L')
   const off = (d: number) =>
     Ps.map(([x, y], i) => [x + normals[i][0] * d * sc, y + normals[i][1] * d * sc] as [number, number])
+  /** 轮廓线在赤道处水平延伸到筒身段末端的路径 */
+  const toCyl = (pts: Array<[number, number]>, yEnd: number) => `${path(pts)} L${xCylEnd.toFixed(1)},${yEnd.toFixed(1)}`
 
-  // 逐组累加外表面：顺序 = 用户给定的缠绕先后，最后一组即最外层
+  // 逐组累加外表面：顺序 = 用户给定的缠绕先后，最后一组即最外层；各条轮廓线在赤道后水平延伸入筒身段
   const cum: number[][] = []
   let acc: number[] = new Array(N).fill(0)
   groups.forEach((g) => {
@@ -106,7 +109,7 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
       const d = cum[gi][i]
       return [x + normals[i][0] * d * sc, y + normals[i][1] * d * sc] as [number, number]
     })
-    return { angle: g.angle, color: angleColor(g.angle, gi), d: path(pts) }
+    return { angle: g.angle, color: angleColor(g.angle, gi), d: toCyl(pts, pts[N - 1][1]) }
   })
 
   const peakIdx = prof.reduce((b, p, i) => (p.tTotal > prof[b].tTotal ? i : b), 0)
@@ -127,17 +130,18 @@ function buildGeom(input: DesignInput, result: CheckResult, W: number, H: number
     r2b: g.r2b <= R ? markAt(g.r2b, gi) : null,
   }))
 
+  const topCum = cum.length ? cum[cum.length - 1][N - 1] : 0
   return {
     sc,
     x0,
     xEq,
     xCylEnd,
     axisY,
-    outer: path(Ps),
-    inner: path(off(-liner)),
+    outer: toCyl(Ps, axisY - R * sc),
+    inner: toCyl(off(-liner), axisY - (R - liner) * sc),
     layers,
     boss: { x: x0 - 7, y: axisY - rStart * sc, w: 7, h: rStart * sc },
-    wallYs: [axisY - R * sc, axisY - (R + spiralThk) * sc, axisY - (R + wall) * sc],
+    cylTopY: axisY - (R + topCum) * sc,
     peakTotal: { t: pk.tTotal, r: pk.r, x: px, y: py },
     marks,
     rStart,
@@ -163,7 +167,7 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
   const groups = props.result.dome.groups
   const o = { layers: true, r0Marks: true, r2bMarks: true, ...props.opts }
 
-  /** 图例条目：内衬 + 各角度组，按画布宽换行，最后一行贴着画布底边 */
+  /** 图例条目：内衬 + 各角度组（轮廓线延伸入筒身段，沿用同一图例），按画布宽换行，最后一行贴着画布底边 */
   const legend: Array<{ label: string; color: string }> = [
     { label: '内衬', color: '#94a3b8' },
     ...groups.map((gr, i) => ({ label: `${Number(gr.angle.toFixed(2))}°×${gr.layers} 层`, color: angleColor(gr.angle, i) })),
@@ -189,8 +193,14 @@ export function DomeContour(props: { input: DesignInput; result: CheckResult; W?
             <rect x={mk.r2b![0] - 2.2} y={mk.r2b![1] - 2.2} width="4.4" height="4.4" fill="#fff" stroke={mk.color} strokeWidth="1.3" />
           </g>
         ))}
-      {/* 封头外表面加粗 */}
+      {/* 封头外表面加粗（含筒身段参考面直段） */}
       <path d={g.outer} fill="none" stroke="#1e3a5f" strokeWidth="1.7" />
+      {/* 筒身段：各缠绕层轮廓线在赤道后水平延伸（只加段名标注） */}
+      {g.xCylEnd > g.xEq && (
+        <text x={(g.xEq + g.xCylEnd) / 2} y={g.cylTopY - 8} fontSize="9.5" fill="#64748b" textAnchor="middle">
+          筒身段
+        </text>
+      )}
       {/* 峰值标注 */}
       <text x={Math.min(VW - 156, g.peakTotal.x + 10)} y={Math.max(24, g.peakTotal.y - 6)} fontSize="10" fontWeight="bold" fill="#1e3a5f">
         最厚 {n(g.peakTotal.t)} mm @ r≈{n(g.peakTotal.r, 0)}
