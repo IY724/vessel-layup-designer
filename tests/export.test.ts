@@ -7,6 +7,9 @@ import { FORMULAS } from '../src/core/excelRef'
 import images from '../src/export/formulaImages.json'
 import { runCheck } from '../src/core/checker'
 import { courseInput } from '../src/core/presets'
+import { initialDesign } from '../src/core/initialDesign'
+import { expansionAngles } from '../src/core/expansion'
+import { lambdaFromDepth, windingTurns } from '../src/core/geometry'
 
 const input=courseInput(),res=runCheck(input),raw=buildWorkbook(input,res)
 
@@ -60,16 +63,17 @@ describe('实际导出文件',()=>{
   it('公开计算书逐角度齐全，仅包含计算结果与公式',async()=>{
     const bytes=await workbookBytes(input,res),book=new ExcelJS.Workbook()
     await book.xlsx.load(bytes as never)
-    expect(book.worksheets).toHaveLength(14)
+    expect(book.worksheets).toHaveLength(16)
     expect(book.getWorksheet('说明')).toBeUndefined()
     expect(book.worksheets.every(s=>s.state==='visible')).toBe(true)
+    expect(book.worksheets.map(s=>s.name)).toEqual(['工况与气瓶参数','线型切点设计','铺层角度计算','铺层方案','筒身强度设计与计算','封头-10°','封头-17°','封头-25°','封头-37°','封头-40°','封头-45°','封头总厚度','封头总爆破压强','厚度分布','爆压分布','公式说明'])
     expect(book.worksheets.filter(s=>s.name.startsWith('封头-')).map(s=>s.name)).toEqual(['封头-10°','封头-17°','封头-25°','封头-37°','封头-40°','封头-45°'])
     const saved=XLSX.read(bytes,{type:'array'})
     expect(saved.SheetNames).not.toContain('原版对比')
-    expect(saved.Sheets['方案汇总'].B8.v).toBeCloseTo(102.09988121282991,9)
-    expect(saved.Sheets['方案汇总'].B9.v).toBeCloseTo(95.60087591615947,9)
-    expect(saved.Sheets['方案汇总'].B10.v).toBeCloseTo(76.57491090962243,9)
-    expect(saved.Sheets['方案汇总'].B11.v).toBeCloseTo(.055914150152195294,9)
+    expect(saved.Sheets['工况与气瓶参数'].B8.v).toBeCloseTo(102.09988121282991,9)
+    expect(saved.Sheets['工况与气瓶参数'].B9.v).toBeCloseTo(95.60087591615947,9)
+    expect(saved.Sheets['工况与气瓶参数'].B10.v).toBeCloseTo(76.57491090962243,9)
+    expect(saved.Sheets['工况与气瓶参数'].B11.v).toBeCloseTo(.055914150152195294,9)
     expect(saved.Sheets['封头总厚度'].A148.v).toBe(173.5)
     expect(saved.Sheets['封头总爆破压强'].C148.v).toBeCloseTo(79.38986572678792,9)
     for(const n of saved.SheetNames)for(const [a,c]of Object.entries(saved.Sheets[n])){
@@ -82,6 +86,8 @@ describe('实际导出文件',()=>{
     expect(angle.getCell('G30').formula).toBe('SUM(A30*E23,B30*E24,C30*E25,D30*E26)')
     expect(angle.getCell('H41').formula).toContain('COS(G41/180*PI())^2')
     expect(angle.getCell('A40').value).toBe('平行圆半径\nmm')
+    expect(angle.getCell('G40').value).toBe('封头缠绕角度 K\n°')
+    expect(angle.getCell('H40').value).toBe('爆破压强\nMPa')
     expect(angle.views[0].showGridLines).toBe(true)
     expect(angle.pageSetup.printTitlesRow).toBe('40:40')
     expect(angle.getCell('C6').fill).toMatchObject({fgColor:{argb:'FFF3D4'}})
@@ -96,12 +102,42 @@ describe('实际导出文件',()=>{
     expect(images.map(i=>i.tex)).toEqual(FORMULAS.map(i=>i.formula))
     for(const i of images)expect(Buffer.from(i.base64,'base64').subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a')
   })
+  it('厚度/爆压分布表逐点与内核一致',async()=>{
+    const saved=XLSX.read(await workbookBytes(input,res),{type:'array'})
+    const t=saved.Sheets['厚度分布'],p=saved.Sheets['爆压分布']
+    res.dome.profile.forEach((pt,i)=>{
+      const row=i+5
+      expect(Number(t[`B${row}`].v),`厚度 r=${pt.r}`).toBeCloseTo(pt.tTotal,9)
+      expect(Number(p[`B${row}`].v),`爆压 r=${pt.r}`).toBeCloseTo(pt.pTotal,9)
+      expect(Number(p[`C${row}`].v)).toBeCloseTo(res.derived.pb,9)
+    })
+  })
+  it('线型切点与铺层角度计算表就位，活公式与内核一致',async()=>{
+    const bytes=await workbookBytes(input,res),book=new ExcelJS.Workbook()
+    await book.xlsx.load(bytes as never)
+    expect(book.getWorksheet('工况与气瓶参数')!.getCell('A21').value).toBe('设计指标与工况')
+    const line=book.getWorksheet('线型切点设计')!
+    expect(line.getCell('C15').formula).toBe('ASIN(B9/B7)/PI()*180')
+    expect(line.getCell('C15').result as number).toBeCloseTo(Math.asin(res.derived.r0/input.geometry.R)*180/Math.PI,9)
+    const vp={R_in:input.geometry.R,l:input.geometry.cylLength,lambda:lambdaFromDepth(input.geometry.R,input.geometry.headShortAxis),r0:res.derived.r0,Kf:0.8}
+    expect(line.getCell('C19').formula).toBe('2*C18')
+    expect(line.getCell('C19').result as number).toBeCloseTo(windingTurns(vp).roundTrip,9)
+    const calc=book.getWorksheet('铺层角度计算')!
+    expect(calc.getCell('C17').value).toBe(input.constraint.alphaRef)
+    expect(calc.getCell('C24').formula).toBe('CEILING(C22,2)')
+    const initial=initialDesign(input)
+    expect(calc.getCell('C24').result).toBe(initial.spiral)
+    expect(calc.getCell('C25').result).toBe(initial.hoop)
+    const cands=expansionAngles(input.geometry.R,res.derived.r0,res.derived.bandTotal)
+    expect(calc.getCell('B31').result as number).toBeCloseTo(cands[0].diameter,9)
+    expect(calc.getCell('C31').result as number).toBeCloseTo(cands[0].angle,9)
+  })
   it('单角度、重复角度、停用组、十二个角度组可导出',async()=>{
     for(const spiral of [[{angle:10,layers:4}],[{angle:10,layers:4},{angle:10,layers:2},{angle:40,layers:4,active:false}],Array.from({length:12},(_,i)=>({angle:10+i*3,layers:2}))]){
       const data={...input,plan:{spiral,hoop:20}},result=runCheck(data),book=new ExcelJS.Workbook()
       await book.xlsx.load(await workbookBytes(data,result) as never)
       expect(book.worksheets.filter(s=>s.name.startsWith('封头-'))).toHaveLength(result.dome.groups.length)
-      expect(book.getWorksheet('方案汇总')!.getCell('B16').result).toBeGreaterThan(0)
+      expect(book.getWorksheet('工况与气瓶参数')!.getCell('B16').result).toBeGreaterThan(0)
       expect(book.getWorksheet('原版对比')).toBeUndefined()
     }
   },15000)

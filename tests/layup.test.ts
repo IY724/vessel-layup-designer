@@ -87,7 +87,7 @@ describe('统一螺旋/环向铺层顺序及类型计算', () => {
   it('混合环向角、重复螺旋、停用组导出保持顺序和汇总，公式不固定90°', async () => {
     const data = { ...input, plan: planFromRows(rows) },res = runCheck(data)
     const bytes = await workbookBytes(data,res),book=XLSX.read(bytes,{type:'array'})
-    const layup=book.Sheets['铺层方案'],summary=book.Sheets['方案汇总']
+    const layup=book.Sheets['铺层方案'],summary=book.Sheets['工况与气瓶参数']
     expect([5,6,7,8].map(r=>[layup[`B${r}`].v,layup[`C${r}`].v])).toEqual([['螺旋',10],['环向',85],['螺旋',40],['环向',90]])
     expect(layup.H6.v).toBeGreaterThan(0)
     expect(layup.C6.f).toContain('筒身强度设计与计算')

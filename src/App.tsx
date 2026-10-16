@@ -4,7 +4,7 @@ import { useDesign } from './state/store'
 import { InputPanel } from './ui/InputPanel'
 import { Overview } from './ui/Overview'
 import { CylinderPanel } from './ui/CylinderPanel'
-import { DomeContour, DomePanel, PressureChart } from './ui/DomePanel'
+import { DomeContour, DomePanel, PressureChart, ThicknessChart } from './ui/DomePanel'
 import { DetailView } from './ui/DetailView'
 import { GeometryPanel } from './ui/GeometryPanel'
 import { AutoDesignModal } from './ui/AutoDesignModal'
@@ -19,7 +19,7 @@ export const releaseLabel = `V${packageVersion.split('.').slice(0, 2).join('.')}
 export default function App() {
   const store = useDesign()
   const { input, result, setInput, reset } = store
-  const [expand, setExpand] = useState<'contour' | 'curve' | 'detail' | null>(null)
+  const [expand, setExpand] = useState<'contour' | 'curve' | 'thickness' | 'detail' | null>(null)
   const [auto, setAuto] = useState(false)
   const [msg, setMsg] = useState('')
   const [exporting, setExporting] = useState(false)
@@ -106,6 +106,11 @@ export default function App() {
       {expand === 'curve' && (
         <Modal title="封头爆破压强分布" onClose={() => setExpand(null)} wide>
           <PressureChart input={input} result={result} W={1360} H={620} />
+        </Modal>
+      )}
+      {expand === 'thickness' && (
+        <Modal title="封头厚度分布" onClose={() => setExpand(null)} wide>
+          <ThicknessChart input={input} result={result} W={1360} H={620} />
         </Modal>
       )}
       {expand === 'detail' && (

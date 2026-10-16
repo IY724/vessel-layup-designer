@@ -9,10 +9,18 @@ import type { CheckResult, DesignInput } from '../core/types'
 import { domeAt } from '../core/dome'
 import { effectiveRBoss } from '../core/checker'
 import { angleColor } from './colors'
-import { FormulaHelp } from './FormulaHelp'
+import { FormulaHelp, type FormulaItem } from './FormulaHelp'
 import { sym } from './Sym'
 
 const n = (v: number, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '—')
+
+/** 封头厚度公式（左轮廓面板与右厚度分布图共用） */
+const thicknessHelp: FormulaItem[] = [
+  { frm: 't(r)=m_1+m_2 r+m_3 r^2+m_4 r^3\\quad(r_0\\le r\\le r_{2b})', desc: 'm_1…m_4 由 4 个条件定出：t(r_0) = t_p；在 r_2b 处与覆盖公式连续且斜率连续；∫2πr·t dr = V_1 + V_2（纤维体积守恒）' },
+  { frm: 't(r)=\\dfrac{m_R n_R t_p}{\\pi}\\left[\\arccos\\dfrac{r_0}{r}-\\arccos\\dfrac{r_b}{r}\\right]\\quad(r>r_{2b})' },
+  { frm: 'cycles=\\dfrac{n}{2}', desc: '该组缠绕循环数 = 层数 ÷ 2' },
+  { frm: 't_g(r)=cycles\\cdot t(r)' },
+]
 
 interface Geom {
   sc: number
@@ -318,9 +326,119 @@ export function PressureChart(props: {
   )
 }
 
-export function DomePanel(props: { input: DesignInput; result: CheckResult; onExpand: (which: 'contour' | 'curve') => void }) {
+/** 封头厚度分布图：总厚度 t总(r) 曲线 + 筒身螺旋厚度参考线，hover 显示总厚与各组拆分 */
+export function ThicknessChart(props: {
+  input: DesignInput
+  result: CheckResult
+  W?: number
+  H?: number
+}) {
+  const W = props.W ?? 560
+  const H = props.H ?? 380
+  const [hover, setHover] = useState<number | null>(null)
+  const { input, result } = props
+  const R = input.geometry.R
+  const { dome, derived } = result
+  const prof = dome.profile
+  const rStart = prof.length ? prof[0].r : 0
+  const rBoss = effectiveRBoss(input)
+  const tRef = result.cylinder.spiralThickness
+
+  const pad = { l: 46, r: 18, t: 18, b: 36 }
+  const tMax = Math.max(tRef * 1.6, ...prof.map((p) => p.tTotal)) * 1.08
+  const X = (r: number) => pad.l + ((r - rStart) / Math.max(1e-6, R - rStart)) * (W - pad.l - pad.r)
+  const Y = (t: number) => H - pad.b - (t / tMax) * (H - pad.t - pad.b)
+
+  const curve = 'M' + prof.map((p) => `${X(p.r).toFixed(1)},${Y(p.tTotal).toFixed(1)}`).join(' L')
+
+  const rTicks = [0, 0.25, 0.5, 0.75].map((t) => rStart + t * (R - rStart))
+  const tTicks = [0, 0.25, 0.5, 0.75].map((t) => t * tMax)
+  const hp = hover === null ? null : domeAt(dome.groups, hover, R, derived.sigmaComposite, input.requirement.ks)
+
+  const tickFmt = (t: number) => (tMax < 10 ? t.toFixed(2) : t.toFixed(1))
+
+  return (
+    <svg
+      className="viz"
+      viewBox={`0 0 ${W} ${H}`}
+      onMouseMove={(e) => {
+        const box = e.currentTarget.getBoundingClientRect()
+        const x = ((e.clientX - box.left) / box.width) * W
+        const t = (x - pad.l) / (W - pad.l - pad.r)
+        setHover(rStart + Math.max(0, Math.min(1, t)) * (R - rStart))
+      }}
+      onMouseLeave={() => setHover(null)}
+    >
+      <rect
+        x={X(rStart)}
+        y={pad.t}
+        width={Math.max(0, X(Math.min(rBoss, R)) - X(rStart))}
+        height={H - pad.t - pad.b}
+        fill="#94a3b8"
+        opacity="0.13"
+      />
+      <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={pad.t + 12} fontSize="9" fill="#64748b" textAnchor="middle">
+        极孔侧
+      </text>
+      <text x={(X(rStart) + X(Math.min(rBoss, R))) / 2} y={pad.t + 24} fontSize="9" fill="#64748b" textAnchor="middle">
+        部分角度铺到
+      </text>
+      {tTicks.map((t, i) => (
+        <g key={i}>
+          <line x1={pad.l} y1={Y(t)} x2={W - pad.r} y2={Y(t)} stroke="#eef2f7" />
+          <text x={pad.l - 6} y={Y(t) + 3} fontSize="10" fill="#94a3b8" textAnchor="end">
+            {tickFmt(t)}
+          </text>
+        </g>
+      ))}
+      {rTicks.map((r, i) => (
+        <text key={i} x={X(r)} y={H - pad.b + 14} fontSize="10" fill="#94a3b8" textAnchor="middle">
+          {r.toFixed(0)}
+        </text>
+      ))}
+      <text x={X(R)} y={H - pad.b + 14} fontSize="10" fill="#1e3a5f" fontWeight="bold" textAnchor="middle">
+        R
+      </text>
+      <text x={W / 2} y={H - 4} fontSize="10.5" fill="#64748b" textAnchor="middle">
+        平行圆半径 r (mm)
+      </text>
+      <text x={12} y={(pad.t + H - pad.b) / 2} fontSize="10" fill="#94a3b8" textAnchor="middle" transform={`rotate(-90 12 ${(pad.t + H - pad.b) / 2})`}>
+        厚度 (mm)
+      </text>
+      <line x1={pad.l} y1={Y(tRef)} x2={W - pad.r} y2={Y(tRef)} stroke="#a56859" strokeWidth="1.5" strokeDasharray="6,4" />
+      <text x={W - pad.r - 2} y={Y(tRef) - 5} fontSize="10" fill="#a56859" fontWeight="bold" textAnchor="end">
+        筒身螺旋厚度 {n(tRef)}
+      </text>
+      <path d={curve} fill="none" stroke="#1e3a5f" strokeWidth="2.4" strokeLinejoin="round" />
+      <circle cx={X(R)} cy={Y(prof.length ? prof[prof.length - 1].tTotal : 0)} r="3" fill="#1e3a5f" />
+      {hp && (
+        <g>
+          <line x1={X(hp.r)} y1={pad.t} x2={X(hp.r)} y2={H - pad.b} stroke="#475569" strokeWidth="0.8" strokeDasharray="3,3" />
+          <circle cx={X(hp.r)} cy={Y(hp.tTotal)} r="3.5" fill="#1e3a5f" />
+          <g transform={`translate(${Math.min(W - 180, Math.max(pad.l, X(hp.r) + 10))},${pad.t + 6})`}>
+            <rect width="170" height={36 + hp.tGroups.length * 11} rx="5" fill="#0f172a" opacity="0.9" />
+            <text x="8" y="15" fontSize="10.5" fill="#fff">
+              r = {n(hp.r, 1)} mm　总厚 = {n(hp.tTotal)} mm
+            </text>
+            <text x="8" y="29" fontSize="9.5" fill="#cbd5e1">
+              参考：筒身螺旋厚度 {n(tRef)} mm
+            </text>
+            {hp.tGroups.map((t, i) => (
+              <text key={i} x="8" y={42 + i * 11} fontSize="9.5" fill={angleColor(dome.groups[i].angle, i)}>
+                {Number(dome.groups[i].angle.toFixed(2))}°：厚 {n(t, 3)} mm
+              </text>
+            ))}
+          </g>
+        </g>
+      )}
+    </svg>
+  )
+}
+
+export function DomePanel(props: { input: DesignInput; result: CheckResult; onExpand: (which: 'contour' | 'curve' | 'thickness') => void }) {
   const { input, result } = props
   const [opts, setOpts] = useState<ContourOpts>({ layers: true, r0Marks: true, r2bMarks: true })
+  const [chart, setChart] = useState<'pressure' | 'thickness'>('pressure')
   return (
     <div className="card">
       <h3>
@@ -332,15 +450,7 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
           <h4>封头厚度轮廓（半剖）</h4>
           <div className="sub">
             各角度组累计厚度
-            <FormulaHelp
-              title="封头厚度公式"
-              items={[
-                { frm: 't(r)=m_1+m_2 r+m_3 r^2+m_4 r^3\\quad(r_0\\le r\\le r_{2b})', desc: 'm_1…m_4 由 4 个条件定出：t(r_0) = t_p；在 r_2b 处与覆盖公式连续且斜率连续；∫2πr·t dr = V_1 + V_2（纤维体积守恒）' },
-                { frm: 't(r)=\\dfrac{m_R n_R t_p}{\\pi}\\left[\\arccos\\dfrac{r_0}{r}-\\arccos\\dfrac{r_b}{r}\\right]\\quad(r>r_{2b})' },
-                { frm: 'cycles=\\dfrac{n}{2}', desc: '该组缠绕循环数 = 层数 ÷ 2' },
-                { frm: 't_g(r)=cycles\\cdot t(r)' },
-              ]}
-            />
+            <FormulaHelp title="封头厚度公式" items={thicknessHelp} />
           </div>
           <DomeContour input={input} result={result} opts={opts} />
           <div className="pane-actions">
@@ -362,20 +472,40 @@ export function DomePanel(props: { input: DesignInput; result: CheckResult; onEx
           </div>
         </div>
         <div className="pane">
-          <h4>封头爆破压强分布</h4>
+          <h4>{chart === 'pressure' ? '封头爆破压强分布' : '封头厚度分布'}</h4>
           <div className="sub">
-            <FormulaHelp
-              title="封头爆破压强公式"
-              items={[
-                { frm: '\\alpha(r)=\\arcsin\\dfrac{r_0}{r}', desc: 'r 为该处平行圆半径，r_0 为该角度组的起铺圆' },
-                { frm: 'u=K\\pi/180,\\quad p_g(r)=\\dfrac{2\\,t_g(r)\\,\\sigma_c}{R}\\cos^2 u' },
-                { frm: 'p_{\\text{总}}(r)=k_s\\sum p_g(r)', desc: 'k_s 为应力平衡系数；图中曲线已乘 k_s' },
-              ]}
-            />
+            {chart === 'pressure' ? (
+              <FormulaHelp
+                title="封头爆破压强公式"
+                items={[
+                  { frm: '\\alpha(r)=\\arcsin\\dfrac{r_0}{r}', desc: 'r 为该处平行圆半径，r_0 为该角度组的起铺圆' },
+                  { frm: 'u=K\\pi/180,\\quad p_g(r)=\\dfrac{2\\,t_g(r)\\,\\sigma_c}{R}\\cos^2 u' },
+                  { frm: 'p_{\\text{总}}(r)=k_s\\sum p_g(r)', desc: 'k_s 为应力平衡系数；图中曲线已乘 k_s' },
+                ]}
+              />
+            ) : (
+              <FormulaHelp title="封头厚度公式" items={thicknessHelp} />
+            )}
           </div>
-          <PressureChart input={input} result={result} />
+          {chart === 'pressure' ? <PressureChart input={input} result={result} /> : <ThicknessChart input={input} result={result} />}
           <div className="pane-actions">
-            <button className="btn sm" onClick={() => props.onExpand('curve')}>
+            <button
+              type="button"
+              className={chart === 'pressure' ? 'btn sm primary' : 'btn sm'}
+              aria-pressed={chart === 'pressure'}
+              onClick={() => setChart('pressure')}
+            >
+              爆压分布
+            </button>
+            <button
+              type="button"
+              className={chart === 'thickness' ? 'btn sm primary' : 'btn sm'}
+              aria-pressed={chart === 'thickness'}
+              onClick={() => setChart('thickness')}
+            >
+              厚度分布
+            </button>
+            <button className="btn sm" onClick={() => props.onExpand(chart === 'pressure' ? 'curve' : 'thickness')}>
               放大
             </button>
           </div>

@@ -1,9 +1,13 @@
 import ExcelJS from 'exceljs'
 import { CFB, utils, type WorkBook } from 'xlsx'
 import type { CheckResult, DesignInput } from '../core/types'
-import { layupGroups } from '../core/layup'
+import { activeGroups, layupGroups } from '../core/layup'
+import { initialDesign } from '../core/initialDesign'
+import { expansionAngles } from '../core/expansion'
+import { allowedLineTypes, computeVolume, intersectLineTypes, lambdaFromDepth, windingTurns, type VolumeParams } from '../core/geometry'
 import images from './formulaImages.json'
 import { addNativeCharts, type NativeChart } from './nativeCharts'
+import { domeContourFigure, lineTypeFigure } from './figures'
 
 type Sheet = ExcelJS.Worksheet
 type AddressMap = Record<string,string>
@@ -132,7 +136,7 @@ function dome(ws:Sheet,res:CheckResult,index:number){
   table(ws,'F36:H37',false);ws.getCell('F36').value='厚度公式切换半径';ws.getCell('H36').value='mm';if(!ws.getCell('G36').formula)input(ws,'G36')
   ws.getCell('F37').value='层数';ws.getCell('G37').value=live('E41',g.cycles);ws.getCell('H37').value='循环';input(ws,'E41','0.0')
   section(ws,39,'逐点厚度与局部参考值');table(ws,`A40:H${end}`)
-  ;['平行圆半径\nmm','2倍带宽内厚度\nmm','2倍带宽外厚度\nmm','厚度\nmm','层数','总厚度\nmm','封头局部角 K\n°','局部参考爆压\nMPa'].forEach((s,i)=>ws.getCell(40,i+1).value=s)
+  ;['平行圆半径\nmm','2倍带宽内厚度\nmm','2倍带宽外厚度\nmm','厚度\nmm','层数','总厚度\nmm','封头缠绕角度 K\n°','爆破压强\nMPa'].forEach((s,i)=>ws.getCell(40,i+1).value=s)
   ws.getRow(40).height=50
   for(let r=41;r<=end;r++){ws.getCell(`A${r}`).numFmt='0.0';ws.getCell(`E${r}`).numFmt='0.0';ws.getCell(`G${r}`).numFmt='0.0000'}
   ws.autoFilter=`A40:H${end}`;ws.pageSetup.printArea=`A1:H${end}`;ws.pageSetup.printTitlesRow='40:40';ws.getRow(39).addPageBreak()
@@ -143,7 +147,7 @@ function totals(ws:Sheet,res:CheckResult,pressure:boolean){
   ws.getCell('A4').value='极孔直径\nmm';ws.getCell('B4').value=pressure?'总爆破压强\nMPa':'总厚度\nmm';ws.getCell('C4').value=pressure?'乘平衡系数后\nMPa':''
   if(!pressure)ws.getColumn('C').width=3
   for(let r=5;r<=end;r++)ws.getCell(`A${r}`).numFmt='0.0'
-  ws.autoFilter=`A4:${col(last)}${end}`;ws.pageSetup.printArea=`A1:${col(last)}${end}`;ws.pageSetup.printTitlesRow='4:4'
+  ws.autoFilter=`A4:${col(last)}${end}`;ws.pageSetup.printArea=`A1:${col(last+(pressure?0:8))}${end}`;ws.pageSetup.printTitlesRow='4:4'
 }
 function layup(ws:Sheet,data:DesignInput,res:CheckResult,maps:Record<string,AddressMap>){
   base(ws,[8,13,14,12,17,19,19,20,20,20,20],4);title(ws,'铺层方案','K')
@@ -177,12 +181,46 @@ function summary(ws:Sheet,data:DesignInput,res:CheckResult,maps:Record<string,Ad
     ['封头经验初估',live(`F4*SUM('筒身强度设计与计算'!D${n+23}:D${2*n+22})`,res.head.pressure),live('$B$4',res.derived.pb),live('B10-C10',res.head.pressure-res.derived.pb),live('IF(B10>=C10,"满足","不足")',res.head.pass?'满足':'不足'),''],
     ['局部参考最低值',live(`MIN('封头总爆破压强'!C5:C${end})`,res.dome.minP),'','','参考',live(`INDEX('封头总爆破压强'!A5:A${end},MATCH(B11,'封头总爆破压强'!C5:C${end},0))`,res.dome.minPR)]])
   rows(ws,13,[['厚度项目','计算值 / mm'],['筒身螺旋层',live(target(`I${2*n+mh+17}`),res.cylinder.spiralThickness)],['筒身环向层',live(target(`J${2*n+mh+17}`),res.cylinder.hoopThickness)],['筒身总厚度',live(target(`K${2*n+mh+17}`),res.cylinder.totalThickness)],['封头赤道总厚度',live(`'封头总厚度'!B${end}`,res.dome.tAtR)]])
-  section(ws,20,'计算表');const names=['铺层方案','筒身强度设计与计算',...Object.keys(maps).filter(n=>n.startsWith('封头-')),'封头总厚度','封头总爆破压强','公式说明']
-  names.forEach((name,i)=>{const cell=ws.getCell(22+Math.floor(i/2),i%2?5:1);cell.value={text:name,hyperlink:`#'${name}'!A1`};cell.font={name:'微软雅黑',size:11,color:{argb:C.blue},underline:true}})
-  ws.pageSetup.printArea='A1:H31'
+  // ── 工况与参数明细 ──
+  section(ws,21,'设计指标与工况');rows(ws,22,[
+    ['项目','数值','单位'],
+    ['设计容积 V',data.geometry.volumeL,'L'],
+    ['设计爆破压强 pb',res.derived.pb,'MPa'],
+    ['工作压力',data.requirement.pbMode==='wp_sf'?data.requirement.workingPressure:'—','MPa'],
+    ['安全系数 S',data.requirement.pbMode==='wp_sf'?data.requirement.safetyFactor:'—',''],
+    ['应力平衡系数 ks',data.requirement.ks,''],
+  ])
+  section(ws,29,'几何与内衬');rows(ws,30,[
+    ['项目','数值','单位'],
+    ['筒身段半径 R',data.geometry.R,'mm'],
+    ['筒身段长度 l',data.geometry.cylLength,'mm'],
+    ['封头短半轴 b（半椭球）',data.geometry.headShortAxis,'mm'],
+    ['极孔半径 r0（缠绕）',res.derived.r0,'mm'],
+    ['内衬厚度',data.geometry.linerThickness??3,'mm'],
+  ])
+  section(ws,37,'材料与工艺');rows(ws,38,[
+    ['项目','数值','单位'],
+    ['单束带宽 b',data.material.bandWidth,'mm'],
+    ['每束纱数 n',data.material.strandCount,''],
+    ['总带宽',res.derived.bandTotal,'mm'],
+    ['纤维体积含量 Vf',data.material.vf,''],
+    ['线密度 tex',data.material.tex,'g/m'],
+    ['纤维密度 ρ',data.material.fiberDensity,'g/cm3'],
+    ['纤维单层厚 tf',Number(res.derived.tf.toFixed(4)),'mm'],
+    ['复材单层厚 tc',Number(res.derived.tc.toFixed(4)),'mm'],
+  ])
+  section(ws,48,'强度参数');rows(ws,49,[
+    ['项目','数值','单位'],
+    ['螺旋层发挥强度',res.derived.sigmaSpiral,'MPa'],
+    ['环向层发挥强度',res.derived.sigmaHoop,'MPa'],
+    ['复材层强度 σc',res.derived.sigmaComposite,'MPa'],
+  ])
+  section(ws,54,'计算表');const names=['线型切点设计','铺层角度计算','铺层方案','筒身强度设计与计算',...Object.keys(maps).filter(n=>n.startsWith('封头-')),'封头总厚度','封头总爆破压强','厚度分布','爆压分布','公式说明']
+  names.forEach((name,i)=>{const cell=ws.getCell(55+Math.floor(i/2),i%2?5:1);cell.value={text:name,hyperlink:`#'${name}'!A1`};cell.font={name:'微软雅黑',size:11,color:{argb:C.blue},underline:true}})
+  ws.pageSetup.printArea='A1:H65'
   return {sheetId:ws.id,title:'爆破压强',kind:'bar',yTitle:'MPa',from:{col:3,row:12},to:{col:8,row:18},series:[
-    {name:'计算值',color:C.blue,xFormula:"'方案汇总'!$A$8:$A$10",yFormula:"'方案汇总'!$B$8:$B$10",x:['筒身纵向','筒身环向','封头经验初估'],y:[res.cylinder.pa,res.cylinder.pth,res.head.pressure]},
-    {name:'设计值',color:'A9B5C2',xFormula:"'方案汇总'!$A$8:$A$10",yFormula:"'方案汇总'!$C$8:$C$10",x:['筒身纵向','筒身环向','封头经验初估'],y:[res.derived.pb,res.derived.pb,res.derived.pb]}]}
+    {name:'计算值',color:C.blue,xFormula:"'工况与气瓶参数'!$A$8:$A$10",yFormula:"'工况与气瓶参数'!$B$8:$B$10",x:['筒身纵向','筒身环向','封头经验初估'],y:[res.cylinder.pa,res.cylinder.pth,res.head.pressure]},
+    {name:'设计值',color:'A9B5C2',xFormula:"'工况与气瓶参数'!$A$8:$A$10",yFormula:"'工况与气瓶参数'!$C$8:$C$10",x:['筒身纵向','筒身环向','封头经验初估'],y:[res.derived.pb,res.derived.pb,res.derived.pb]}]}
 }
 function distribution(ws:Sheet,res:CheckResult,pressure:boolean):NativeChart{
   base(ws,[17,22,22,4,...Array(8).fill(12)],4);title(ws,pressure?'封头局部参考爆压分布':'封头厚度分布','L')
@@ -193,6 +231,94 @@ function distribution(ws:Sheet,res:CheckResult,pressure:boolean):NativeChart{
     {name:pressure?'总爆破压强':'总厚度',color:C.blue,xFormula:`'${ws.name}'!$A$5:$A$${end}`,yFormula:`'${ws.name}'!$B$5:$B$${end}`,x:res.dome.profile.map(p=>p.r),y:res.dome.profile.map(p=>pressure?p.pTotal:p.tTotal)},
     {name:pressure?'设计爆破压强':'筒身螺旋厚度',color:'A56859',xFormula:`'${ws.name}'!$A$5:$A$${end}`,yFormula:`'${ws.name}'!$C$5:$C$${end}`,x:res.dome.profile.map(p=>p.r),y:res.dome.profile.map(()=>pressure?res.derived.pb:res.cylinder.spiralThickness),dash:true}]}
 }
+/** 线型切点设计：候选表 + Φ(D) 切线图；返回切线图锚点行（1 基） */
+function lineTypeSheet(ws:Sheet,data:DesignInput,res:CheckResult):number{
+  base(ws,[26,20,20,18,16,16,14,16],4);title(ws,'线型切点设计','H')
+  const R=data.geometry.R,hAxis=data.geometry.headShortAxis||R
+  const vp:VolumeParams={R_in:R,l:data.geometry.cylLength,lambda:lambdaFromDepth(R,hAxis),r0:res.derived.r0,Kf:0.8}
+  const vol=computeVolume(vp),turns=windingTurns(vp)
+  const candidates=intersectLineTypes({lambda:vp.lambda,r0:vp.r0,Kf:vp.Kf},vol.totalL,allowedLineTypes(450,660,4))
+  const currentD=2*R
+  section(ws,4,'设计条件','A','D');rows(ws,5,[
+    ['项目','数值','单位'],
+    ['目标容积 V',Number(vol.totalL.toFixed(3)),'L'],
+    ['筒身内半径 R_in',R,'mm'],
+    ['封头轴比 λ',Number(vp.lambda.toFixed(3)),''],
+    ['极孔半径 r0',vp.r0,'mm'],
+    ['筒身段长度 l',vp.l,'mm'],
+    ['阀座容积折减 Kf',vp.Kf,''],
+  ])
+  section(ws,13,'转角核算','A','D');rows(ws,14,[
+    ['项目','符号','数值','单位'],
+    ['极孔缠绕角','α₀',live('ASIN(B9/B7)/PI()*180',turns.alpha0Deg),'°'],
+    ['筒身转角','γ',live('B10*TAN(C15/180*PI())/(2*PI()*B7)*360',turns.gamma),'°'],
+    ['封头转角','β',live('2*(90+ASIN((B7/B8*TAN(C15/180*PI())-B9)/B7)/PI()*180)',turns.beta),'°'],
+    ['单程转角','θt',live('C16+C17',turns.oneWay),'°'],
+    ['双程转角','θn',live('2*C18',turns.roundTrip),'°'],
+  ])
+  section(ws,21,'候选方案','A','G')
+  const list=candidates.length?candidates.map(c=>[
+    live(`360*(${c.m}+${c.K}/${c.n})`,c.theta),Number(c.D.toFixed(2)),Number(c.l.toFixed(1)),Number(c.ratio.toFixed(3)),c.n,`${c.K} / ${c.m}`,Math.abs(c.D-currentD)<1.5?'是':'—',
+  ]):[['无交点：请调整容积 / 轴比 / 极孔','','','','','','']]
+  rows(ws,22,[['转角 θ / °','外径 D / mm','筒身段长 l / mm','长径比 l/D','切点数 n','K / m','采用'],...list])
+  const noteRow=23+list.length
+  text(ws,`A${noteRow}:G${noteRow}`,'θ = 360°·(m + K/n)：n 为切点数，K、m 为整数（K 与 n 互质）。',10)
+  const imgRow=noteRow+2
+  ws.pageSetup.printArea=`A1:H${imgRow+24}`
+  return imgRow
+}
+
+/** 铺层角度计算：筒身单角度初估 + 扩孔候选（公式带值） */
+function angleCalcSheet(ws:Sheet,data:DesignInput,res:CheckResult){
+  base(ws,[30,16,18,16,16,18,16,14],4);title(ws,'铺层角度计算','H')
+  const d=res.derived
+  const initial=initialDesign(data)
+  const estimate=initial.estimate
+  section(ws,4,'估算参数','A','D');rows(ws,5,[
+    ['项目','数值','单位'],
+    ['筒身半径 R',data.geometry.R,'mm'],
+    ['极孔半径 r0',d.r0,'mm'],
+    ['设计爆破压强 pb',d.pb,'MPa'],
+    ['发挥强度 σ',d.sigmaSpiral,'MPa'],
+    ['纤维单层厚 tf',Number(d.tf.toFixed(6)),'mm'],
+    ['复材单层厚 tc',Number(d.tc.toFixed(6)),'mm'],
+    ['单束带宽 b',data.material.bandWidth,'mm'],
+    ['总带宽 b_tot',d.bandTotal,'mm'],
+  ])
+  section(ws,15,'筒身单角度初估','A','D');rows(ws,16,[
+    ['项目','符号','数值','单位'],
+    ['初估角','α',data.constraint.alphaRef,'°'],
+    ['cosα','',live('COS(C17/180*PI())',estimate.cosRef),''],
+    ['tanα','',live('TAN(C17/180*PI())',estimate.tanRef),''],
+    ['螺旋向纤维厚度','tα',live('B6*B8/(2*B9*C18^2)',estimate.hSpiral),'mm'],
+    ['环向纤维厚度','tθ',live('(2-C19^2)*B6*B8/(2*B9)',estimate.hHoop),'mm'],
+    ['螺旋向层数','nα',live('C20/B10',estimate.nSpiral),'层'],
+    ['环向层数','nθ',live('C21/B10',estimate.nHoop),'层'],
+    ['螺旋初估层数（向上取偶）','',live('CEILING(C22,2)',initial.spiral),'层'],
+    ['环向初估层数（向上取整）','',live('CEILING(C23,1)',initial.hoop),'层'],
+  ])
+  text(ws,'A26:G26','初估角取经验值：23°，或 极孔缠绕角 + 10°（默认 20° = 10° + 10°）；螺旋向上取偶、环向向上取整。',10)
+  text(ws,'A27:G27',`初估复核：纵向 ${initial.pa.toFixed(2)} / 环向 ${initial.pth.toFixed(2)} MPa，${initial.pass?'满足':'不满足'}。`,10)
+  section(ws,29,'扩孔候选','A','G')
+  const picked=new Map(activeGroups(data.plan).filter(g=>g.type==='spiral').map(g=>[Math.round(g.angle),g.layers]))
+  const all=expansionAngles(data.geometry.R,d.r0,d.bandTotal)
+  const shown=all.slice(0,80)
+  const list=shown.map((row,i)=>[
+    i+1,
+    live(row.boundary?'2*$B$6':`2*$B$7+${i}*$B$12`,row.diameter),
+    live(`ASIN(B${31+i}/(2*$B$6))/PI()*180`,row.angle),
+    live(`ROUND(C${31+i},0)`,Math.round(row.angle)),
+    picked.has(Math.round(row.angle))?'是':'—',
+    picked.get(Math.round(row.angle))??'—',
+    row.boundary?'筒身边界':'',
+  ])
+  rows(ws,30,[['序号','扩孔直径 Dᵢ / mm','反算角 αᵢ / °','取整角 / °','采用','分配层数','备注'],...(list.length?list:[['—','—','—','—','—','—','参数不足无法生成候选']])])
+  const noteRow=31+Math.max(1,list.length)
+  text(ws,`A${noteRow+1}:G${noteRow+1}`,'Dᵢ = 2r₀ + i·b；角度按整度四舍五入后写入铺层表；“分配层数”为当前铺层表中该角度的层数。',10)
+  if(all.length>80)text(ws,`A${noteRow+2}:G${noteRow+2}`,`候选共 ${all.length} 项，本表列前 80 项。`,10)
+  ws.pageSetup.printArea=`A1:H${noteRow+3}`
+}
+
 function formulas(wb:ExcelJS.Workbook){
   const ws=wb.getWorksheet('公式说明')!;base(ws,[7,29,85,42],4);title(ws,'计算公式','D');rows(ws,4,[['序号','计算项目','公式','用途']])
   images.forEach((img,i)=>{const row=i+5;ws.getRow(row).values=[i+1,img.label,'',img.purpose];table(ws,`A${row}:D${row}`,false);ws.getCell(`A${row}`).numFmt='0';ws.getRow(row).height=76
@@ -203,15 +329,27 @@ function formulas(wb:ExcelJS.Workbook){
 export async function writePresentation(source:WorkBook,data:DesignInput,res:CheckResult):Promise<Uint8Array>{
   const wb=new ExcelJS.Workbook();wb.creator='复合材料气瓶缠绕铺层设计软件';wb.title='气瓶铺层计算书';wb.calcProperties.fullCalcOnLoad=true
   const names=source.SheetNames.filter(n=>n.startsWith('封头-'))
-  for(const name of ['方案汇总','铺层方案','筒身强度设计与计算',...names,'封头总厚度','封头总爆破压强','厚度分布','爆压分布','公式说明'])wb.addWorksheet(name)
+  for(const name of ['工况与气瓶参数','线型切点设计','铺层角度计算','铺层方案','筒身强度设计与计算',...names,'封头总厚度','封头总爆破压强','厚度分布','爆压分布','公式说明'])wb.addWorksheet(name)
   const maps:Record<string,AddressMap>={'筒身强度设计与计算':cylinderMap(res.cylinder.rows.filter(g=>g.type==='spiral').length,Math.max(1,res.cylinder.rows.filter(g=>g.type==='hoop').length))}
   for(const name of names)maps[name]=domeMap(source,name)
   for(const name of ['封头总厚度','封头总爆破压强']){maps[name]={};mapRange(maps[name],source.Sheets[name]['!ref']!,'A4')}
   copySource(source,wb,maps);cylinder(wb.getWorksheet('筒身强度设计与计算')!,res);names.forEach((name,i)=>dome(wb.getWorksheet(name)!,res,i))
   totals(wb.getWorksheet('封头总厚度')!,res,false);totals(wb.getWorksheet('封头总爆破压强')!,res,true);layup(wb.getWorksheet('铺层方案')!,data,res,maps)
-  const charts=[summary(wb.getWorksheet('方案汇总')!,data,res,maps),distribution(wb.getWorksheet('厚度分布')!,res,false),distribution(wb.getWorksheet('爆压分布')!,res,true)]
+  const lineTypeImageRow=lineTypeSheet(wb.getWorksheet('线型切点设计')!,data,res)
+  angleCalcSheet(wb.getWorksheet('铺层角度计算')!,data,res)
+  const charts=[summary(wb.getWorksheet('工况与气瓶参数')!,data,res,maps),distribution(wb.getWorksheet('厚度分布')!,res,false),distribution(wb.getWorksheet('爆压分布')!,res,true)]
   formulas(wb)
   for(const ws of wb.worksheets)ws.eachRow(row=>row.eachCell(cell=>{if(cell.value==='')cell.value=null}))
+  // 插图：在网页/桌面环境里栅格化后嵌入；Node 单测环境没有 DOM，跳过
+  try{
+    const [lineFig,contourFig]=await Promise.all([lineTypeFigure(data,res,720,380),domeContourFigure(data,res,640,310)])
+    const putFigure=(sheet:string,base64:string,w:number,h:number,tl:{col:number;row:number})=>{
+      const target=wb.getWorksheet(sheet);if(!target)return
+      const id=wb.addImage({base64,extension:'png'});target.addImage(id,{tl,ext:{width:w,height:h}})
+    }
+    putFigure('线型切点设计',lineFig.base64,lineFig.width/2,lineFig.height/2,{col:0,row:lineTypeImageRow-1})
+    putFigure('封头总厚度',contourFig.base64,contourFig.width/2,contourFig.height/2,{col:3+res.dome.groups.length+1,row:3})
+  }catch{}
   const bytes=new Uint8Array(await wb.xlsx.writeBuffer()),zip=CFB.read(bytes,{type:'array'});addNativeCharts(zip,charts)
   return CFB.write(zip,{fileType:'zip',type:'array',compression:true}) as Uint8Array
 }

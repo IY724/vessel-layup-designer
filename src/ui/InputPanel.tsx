@@ -210,7 +210,18 @@ export function InputPanel({ store }: { store: DesignStore }) {
         />
       </Section>
 
-      <Section title="筒身层数计算">
+      <Section
+        title="筒身层数计算"
+        tail={
+          <FormulaHelp
+            title="初估角怎么取"
+            items={[
+              { frm: '\\alpha_0=\\arcsin\\dfrac{r_0}{R}', desc: '极孔反算角' },
+              { note: '经验取法：初估角取 23°，或 极孔缠绕角 + 10°（默认 20° = 10° + 10°）。仅用于初估层数。' },
+            ]}
+          />
+        }
+      >
         <Num label="筒身计算角度" value={input.constraint.alphaRef} unit="°" invalid={!(input.constraint.alphaRef>0 && input.constraint.alphaRef<54.7356)} onChange={v => v !== null && patch('constraint', { alphaRef: v })} />
         <InitialEstimateFields input={input} />
       </Section>

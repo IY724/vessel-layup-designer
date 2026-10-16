@@ -492,7 +492,7 @@ function cacheResults(wb: XLSX.WorkBook, input: DesignInput, res: CheckResult, g
 /** 供测试：只生成 workbook 不下载 */
 export function buildWorkbook(input: DesignInput, res: CheckResult) {
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, summarySheet(input, res), '方案汇总')
+  XLSX.utils.book_append_sheet(wb, summarySheet(input, res), '工况与气瓶参数')
   XLSX.utils.book_append_sheet(wb, cylinderSheet(input, res), '筒身强度设计与计算')
   const grid = headGrid(res.dome.rFirst, input.geometry.R)
   const names = sheetNames(res.dome.groups)

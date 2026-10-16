@@ -110,8 +110,8 @@ describe('课件单角度初估接入扩孔设计', () => {
       expect(raw.C29.v).toBe(initialDesign(data).hoop)
       expect(raw.C27.f).toContain('ROUNDUP(B27/2,0)')
       const book = XLSX.read(await workbookBytes(input,result),{type:'array'})
-      expect(book.Sheets['方案汇总'].B8.v).toBeCloseTo(result.cylinder.pa,10)
-      expect(book.Sheets['方案汇总'].B9.v).toBeCloseTo(result.cylinder.pth,10)
+      expect(book.Sheets['工况与气瓶参数'].B8.v).toBeCloseTo(result.cylinder.pa,10)
+      expect(book.Sheets['工况与气瓶参数'].B9.v).toBeCloseTo(result.cylinder.pth,10)
       expect(book.SheetNames.filter(n=>n.startsWith('封头-'))).toHaveLength(8)
     }
   },15000)
