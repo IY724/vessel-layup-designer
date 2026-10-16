@@ -47,8 +47,8 @@ try{
   assert.equal(wb.getWorksheet('说明'),undefined)
   assert.equal(wb.getWorksheet('原版对比'),undefined)
   assert.equal(wb.getWorksheet('公式说明').getImages().length,17)
-  assert.ok(Math.abs(wb.getWorksheet('方案汇总').getCell('B10').result-76.57491090962243)<1e-8)
-  assert.ok(Math.abs(wb.getWorksheet('方案汇总').getCell('B11').result-.055914150152195294)<1e-8)
+  assert.ok(Math.abs(wb.getWorksheet('工况与气瓶参数').getCell('B10').result-76.57491090962243)<1e-8)
+  assert.ok(Math.abs(wb.getWorksheet('工况与气瓶参数').getCell('B11').result-.055914150152195294)<1e-8)
   assert.ok(Math.abs(wb.getWorksheet('封头总爆破压强').getCell('C148').result-79.38986572678792)<1e-8)
   assert.match(wb.getWorksheet('封头-10°').getCell('H41').formula,/COS\(G41\/180\*PI\(\)\)\^2/)
   for(const s of wb.worksheets)s.eachRow(row=>row.eachCell(cell=>{

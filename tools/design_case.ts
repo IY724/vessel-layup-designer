@@ -137,6 +137,8 @@ const out = {
   final: dump(finalInput, finalRes),
 }
 writeFileSync(resolve(OUT, 'case.json'), JSON.stringify(out, null, 2), 'utf8')
+// 浏览器导出脚本（export_cases_browser.mjs）用它注入 localStorage，生成带插图的案例计算书
+writeFileSync(resolve(OUT, 'inputs.json'), JSON.stringify({ reference: refInput, auto: autoInput, final: finalInput }, null, 2), 'utf8')
 
 console.log('l =', vp.l.toFixed(2), 'mm; V =', vol.totalL.toFixed(3), 'L; θn =', turns.roundTrip.toFixed(2))
 console.log('auto plan:', JSON.stringify(auto.plan), 'verdict', autoRes.verdict, 'pa', autoRes.cylinder.pa.toFixed(2), 'pth', autoRes.cylinder.pth.toFixed(2), 'domeMin', autoRes.dome.minP.toFixed(2))

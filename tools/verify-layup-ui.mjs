@@ -18,6 +18,38 @@ page.on('pageerror', e => failures.push(e.message))
 page.on('console', msg => { if (/same key|unique.*key|React error/i.test(msg.text())) failures.push(msg.text()) })
 const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('vessel-layup-designer.input.v1')))
 const rows = () => page.locator('tr[data-layup-row]')
+const waitFor = async (fn, ms = 4000) => {
+  const t0 = Date.now()
+  while (Date.now() - t0 < ms) {
+    if (await fn()) return
+    await page.waitForTimeout(100)
+  }
+}
+// HTML5 原生拖拽：playwright 的 dragTo 偶发抖动；显式鼠标序列 + 落点停顿 + 至多三次重试
+const dragRow = async (from, to) => {
+  // 滚到视口中央，避免源/目标行钻到固定顶栏下面
+  await rows().nth(Math.round((from + to) / 2)).evaluate((el) => el.scrollIntoView({ block: 'center' }))
+  await page.waitForTimeout(150)
+  const sb = await rows().nth(from).locator('td').last().boundingBox()
+  const db = await rows().nth(to).locator('td').last().boundingBox()
+  const x1 = sb.x + sb.width / 2, y1 = sb.y + sb.height / 2
+  const x2 = db.x + db.width / 2, y2 = db.y + db.height / 2
+  await page.mouse.move(x1, y1)
+  await page.mouse.down()
+  await page.mouse.move(x1 + 10, y1 + 6, { steps: 6 })
+  await page.mouse.move(x2, y2, { steps: 18 })
+  await page.waitForTimeout(120)
+  await page.mouse.move(x2 + 2, y2, { steps: 2 })
+  await page.waitForTimeout(80)
+  await page.mouse.up()
+  await page.waitForTimeout(120)
+}
+const dragRowUntil = async (from, to, pred) => {
+  for (let k = 0; k < 3; k++) {
+    await dragRow(from, to)
+    if (await pred()) return
+  }
+}
 try {
   if (!app) await page.goto(process.argv[2] ?? 'http://127.0.0.1:5186')
   await page.getByRole('button', { name: '恢复默认', exact: true }).click()
@@ -33,6 +65,26 @@ try {
   await firstRadius.scrollIntoViewIfNeeded()
   await page.screenshot({path:path.join(out,'封头逐角校验-半径与平方公式.png')})
   await detail.getByRole('button',{name:'关闭',exact:true}).click()
+  // 封头爆压/厚度分布切换与读数
+  const domeCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: /封头厚度与爆压分布/ }) })
+  await page.getByRole('button', { name: '厚度分布', exact: true }).click()
+  assert.equal(await page.getByRole('heading', { name: '封头厚度分布', exact: true }).count(), 1)
+  const thickSvg = domeCard.locator('.pane').nth(1).locator('svg.viz')
+  const tbox = await thickSvg.boundingBox()
+  await page.mouse.move(tbox.x + tbox.width * 0.85, tbox.y + tbox.height * 0.5)
+  await page.waitForTimeout(150)
+  const thickTexts = await domeCard.locator('.pane').nth(1).locator('svg text').allTextContents()
+  assert.ok(thickTexts.some((t) => t.includes('总厚 =')), '厚度分布 hover 读数缺失')
+  assert.ok(thickTexts.some((t) => t.includes('参考：筒身螺旋厚度')), '厚度参考线读数缺失')
+  await page.screenshot({ path: path.join(out, '封头厚度分布曲线.png') })
+  await page.getByRole('button', { name: '爆压分布', exact: true }).click()
+  assert.equal(await page.getByRole('heading', { name: '封头爆破压强分布', exact: true }).count(), 1)
+  // 初估角说明弹窗
+  await page.locator('button.help-dot[title="初估角怎么取"]').click()
+  const helpText = await page.locator('.modal').innerText()
+  assert.match(helpText, /23°/)
+  assert.match(helpText, /极孔缠绕角 \+ 10°/)
+  await page.locator('.modal').getByRole('button', { name: '关闭', exact: true }).click()
   assert.equal(await page.getByRole('button', { name: /上移|下移/ }).count(), 0)
   assert.equal(await page.getByText('分段取值', { exact: true }).count(), 0)
   assert.equal(await page.getByText('局部曲线最低值', { exact: true }).count(), 0)
@@ -116,14 +168,15 @@ try {
   assert.equal(Number(await page.getByRole('spinbutton', { name: '第1组缠绕角', exact: true }).inputValue()), 90)
   await page.getByRole('combobox', { name: '第1组铺层类型', exact: true }).selectOption('spiral')
   await page.getByRole('spinbutton', { name: '第1组缠绕角', exact: true }).fill('13.3')
-  await rows().nth(8).locator('td').last().dragTo(rows().nth(1).locator('td').last())
+  await dragRowUntil(8, 1, async () => (await read()).plan.groups[1]?.angle === 85)
   saved = await read()
   assert.equal(saved.plan.groups[1].angle, 85)
   assert.equal(saved.plan.groups[1].type, 'hoop')
   await rows().nth(1).locator('.act-toggle').click()
   assert.equal((await read()).plan.groups[1].active, false)
   await rows().nth(1).locator('.act-toggle').click()
-  await rows().nth(0).locator('td').last().dragTo(rows().nth(2).locator('td').last())
+  await waitFor(async () => (await read()).plan.groups[1]?.active !== false)
+  await dragRowUntil(0, 2, async () => (await read()).plan.groups[0]?.angle === 85)
   saved = await read()
   assert.equal(saved.plan.groups[2].angle, 13.3)
   assert.equal(saved.plan.groups[0].angle, 85)
@@ -153,6 +206,8 @@ try {
   report.checks.push('初算角度只在前面的筒身计算输入', '初算层数为只读计算结论', '上游参数变化自动重算结论', '扩孔窗口只选角不重复参数', '最终铺层表可改层数且不反写初算结论')
   report.checks.push('封头逐角表按半径30.2至173.5计算', '无定义的覆盖厚度不显示为零', '10度首行爆压采用正确cos平方')
   report.checks.push('生成后角度按整度四舍五入并实际计算')
+  report.checks.push('封头厚度分布与爆压分布可切换，厚度读数含总厚与筒身参考')
+  report.checks.push('初估角说明弹窗含经验取法 23°/极孔角+10°')
   await writeFile(path.join(out, 'verification.json'), JSON.stringify(report, null, 2))
   console.log(JSON.stringify({ target: report.target, passed: report.checks.length, rendererErrors: failures, report: path.join(out, 'verification.json') }))
 } catch (error) {
