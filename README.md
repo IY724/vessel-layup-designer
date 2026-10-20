@@ -2,11 +2,11 @@
 
 [简体中文](README.zh-CN.md) | **English**
 
+> **Status: code and installer temporarily withdrawn; Releases are unavailable.** Some features are being upgraded and will be fully released later.
+
 > Turn the "course notes + two Excel sheets" manual iteration workflow into a fast, visual, traceable automatic design.
 
 Winding layup design for Type III/IV hydrogen storage pressure vessels. Zero installation, zero network, zero backend: the product is a single `index.html` that runs in any browser; a Windows desktop build is also available.
-
-> **Status: code and installer temporarily withdrawn; Releases are unavailable.** Some features are being upgraded and will be fully released later. For early access, contact **Z25150070@s.upc.edu.cn**.
 
 ## How to use
 
@@ -80,9 +80,7 @@ docs/           UI screenshots
 
 ## Contact
 
-Non-commercial use is allowed. Features are being upgraded; contact **Z25150070@s.upc.edu.cn** for early access.
-
-For issues, open an [Issue](https://github.com/IY724/vessel-layup-designer/issues) or email **Z25150070@s.upc.edu.cn**.
+Please do not use this software for commercial purposes. For any issues, contact **Z25150070@s.upc.edu.cn** directly.
 
 ## Development
 
