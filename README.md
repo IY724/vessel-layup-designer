@@ -1,87 +1,89 @@
-# 复合材料气瓶缠绕铺层设计系统 / Vessel Layup Designer
+# Composite Vessel Winding Layup Design System / Vessel Layup Designer
 
-> 把"课程讲义 + 两张 Excel 手工迭代"的缠绕铺层设计流程，变成秒级、可视、可追溯的自动设计。
+[简体中文](README.zh-CN.md) | **English**
 
-面向 Ⅲ/Ⅳ 型储氢高压复合材料气瓶的缠绕铺层设计。零安装、零联网、零后端：产物是单个 `index.html`，浏览器打开即用，另有 Windows 桌面版。
+> Turn the "course notes + two Excel sheets" manual iteration workflow into a fast, visual, traceable automatic design.
 
-> **当前状态：代码与安装包暂时撤回，Releases 暂不可用。** 部分功能正在更新，后续会完全开放。如需交流或试用，请联系 **Z25150070@s.upc.edu.cn**。
+Winding layup design for Type III/IV hydrogen storage pressure vessels. Zero installation, zero network, zero backend: the product is a single `index.html` that runs in any browser; a Windows desktop build is also available.
 
-## 怎么用
+> **Status: code and installer temporarily withdrawn; Releases are unavailable.** Some features are being upgraded and will be fully released later. For early access, contact **Z25150070@s.upc.edu.cn**.
 
-1. 填几何参数、纤维与工艺、强度三组输入；
-2. 点「自动生成铺层」，在扩孔候选表里选角度（默认跳选 8 组）；
-3. 软件写入铺层表并分别校核筒身双向与封头逐点强度，未达标时给出一行补层建议；
-4. 在铺层表里调整各组层数、角度、类型与顺序，满意后点「导出 Excel 计算书」或「打印 / PDF」。
+## How to use
 
-顶部还有「恢复默认」（回到默认模板）与「校核明细」（逐格核验）。每个字段旁的「?」弹窗给出该参数的作用与公式。
+1. Fill in the geometry, fiber/process and strength inputs.
+2. Click **Auto-generate layup** and select angles in the expansion candidate table (default: every other of 8 groups).
+3. The software writes the layup table and checks the cylinder in both directions and the dome point by point. If a check fails, it gives a one-line ply-addition suggestion.
+4. Adjust the layers, angles, type and order in the layup table, then export the Excel calculation book or print/PDF.
 
-## 界面
+The top bar also has **Restore defaults** and **Check details** (cell-by-cell verification). The **?** popup next to each field explains the parameter and its formula.
+
+## Interface
 
 <table>
-<tr><td align="center" width="33.3%"><img src="docs/softcopyright-main.png" width="96%"/><br/>主工作台：左侧输入，右侧计算结果与筒身铺层表</td><td align="center" width="33.3%"><img src="docs/softcopyright-layup.png" width="96%"/><br/>铺层方案编辑与封头校核双视图</td><td align="center" width="33.3%"><img src="docs/softcopyright-geometry.png" width="96%"/><br/>容积互算与缠绕线型切点设计</td></tr>
-<tr><td align="center" width="33.3%"><img src="docs/softcopyright-formula.png" width="96%"/><br/>公式弹窗：变量含义与公式</td><td align="center" width="33.3%"><img src="docs/softcopyright-detail.png" width="96%"/><br/>全参数逐格核验与明细审计</td><td width="33.3%"></td></tr>
+<tr><td align="center" width="33.3%"><img src="docs/softcopyright-main.png" width="96%"/><br/>Main workbench: inputs on the left, results and cylinder layup table on the right</td><td align="center" width="33.3%"><img src="docs/softcopyright-layup.png" width="96%"/><br/>Layup plan editing and dome check views</td><td align="center" width="33.3%"><img src="docs/softcopyright-geometry.png" width="96%"/><br/>Volume/size conversion and winding line-type tangent design</td></tr>
+<tr><td align="center" width="33.3%"><img src="docs/softcopyright-formula.png" width="96%"/><br/>Formula popup: variable meanings and formulas</td><td align="center" width="33.3%"><img src="docs/softcopyright-detail.png" width="96%"/><br/>Full-parameter cell-by-cell verification and detail audit</td><td width="33.3%"></td></tr>
 </table>
 
-## 功能一览
+## Features
 
-| 板块 | 能力 |
+| Module | Capability |
 |---|---|
-| 几何参数 | 筒身段半径 R、极孔半径取法（直接填缠绕极孔，或按瓶口内半径 + 内衬厚）、封头深度 b、筒身段长度、设计容积、内衬厚度 |
-| 纤维与工艺 | 线密度 tex、纤维密度 ρ、单束带宽 b、每束纱数 n、纤维体积含量 Vf、树脂密度，自动推出单层纤维厚 tf、含树脂单层厚 tc 与总带宽 |
-| 强度输入 | 模式 A 由 NOL 强度自算；模式 B 直接给定，螺旋与环向可分设 |
-| 测地线 | 极孔半径与缠绕角双向互算，逐组扩孔并做极孔一致性校验 |
-| 筒身校核 | 多角混合铺层的纵向与环向爆压、最小裕度、筒身总厚度 |
-| 封头校核 | 按缠绕规律逐点求厚度分布与爆压分布，给出最低爆压所在半径区间与薄弱处提示 |
-| 自动生成 | 先算筒身单角度层数并校核，只读输出结论；扩孔候选按两倍带宽衔接，可勾选任意组合 |
-| 铺层表编辑 | 螺旋与环向共用一张有序表，每行选类型、填角度与层数，支持拖动换序、停用与增删；环向组不进入封头计算 |
-| 几何板块 | 容积与尺寸互算、内胆纵剖面轮廓、线型缠绕切点校验、Ⅳ 型瓶接头尺寸与约束链 |
-| 导出 | Excel 计算书（默认 16 张表，单元格为活公式）、方案 JSON 导入导出、打印 / PDF |
+| Geometry | Cylinder radius R, pole radius (winding pole directly, or boss bore + liner thickness), dome depth b, cylinder length, design volume, liner thickness |
+| Fiber and process | Linear density tex, fiber density ρ, band width b, yarns per band n, fiber volume fraction Vf, resin density; derives single-layer fiber thickness tf, composite layer thickness tc and total band width |
+| Strength input | Mode A derives from NOL strength; Mode B takes values directly, with separate spiral and hoop strengths |
+| Geodesics | Bidirectional pole radius / winding angle conversion, group-by-group expansion and pole consistency check |
+| Cylinder check | Longitudinal and hoop burst pressure, minimum margin and total thickness for mixed-angle layups |
+| Dome check | Point-wise thickness and burst pressure from the winding pattern, with the lowest-pressure radius range and weak-point hints |
+| Auto-generation | Cylinder single-angle layer count and check first; read-only conclusion; expansion candidates connected by two band widths, any combination selectable |
+| Layup table | Spirals and hoops share one ordered table; each row has type, angle and layer count, with drag reorder, disable, add and delete; hoop groups do not enter the dome calculation |
+| Geometry module | Volume/size conversion, liner meridian profile, line-type winding tangency check, Type IV joint dimensions and constraint chain |
+| Export | Excel calculation book (16 tables by default, live formulas), plan JSON import/export, print/PDF |
 
-## 快速开始
+## Quick start
 
-**只想用**：到 Releases 下载 `index.html` 单文件，拷到任何机器上用浏览器打开即可。
+**Just use it**: download the single-file `index.html` from Releases and open it in a browser.
 
-**给别人用**：把 `dist/index.html` 发过去即可。
+**Share it**: send `dist/index.html`.
 
-**想改**：
+**Modify it**:
 
 ```bash
 npm install
-npm run dev            # 本地开发 http://localhost:5173
-npm test               # 基准测试
-npm run build:single   # 产出 dist/index.html 单文件
+npm run dev            # local development at http://localhost:5173
+npm test               # baseline tests
+npm run build:single   # build the single-file dist/index.html
 ```
 
-## 目录结构
+## Project structure
 
 ```
-src/core/       纯计算核心（无 UI 依赖，可独立单测）
-  types.ts        输入 / 方案 / 结果类型
-  materials.ts    工艺参数链、强度模式 A/B
-  geodesic.ts     测地线：角度与极孔互算、一致性校验
-  netting.ts      筒身爆压与初估
-  dome.ts         封头厚度分布与逐点爆压
-  checker.ts      汇总校核：判定范围、薄弱处定位、重量参考、调整建议
-  designer.ts     自动铺层方案生成
-  geometry.ts     几何板块：容积互算、半椭球轮廓、线型切点、接头尺寸链
-  presets.ts      默认模板
-src/ui/         输入面板 / 自动生成弹窗 / 铺层表 / 封头轮廓与爆压曲线 / 几何面板 / 校核明细
-src/state/      单一状态源：输入 + 方案 → 纯函数全量重算
-tests/          基准测试
-docs/           界面截图
+src/core/       Pure calculation core (no UI dependency, unit-testable)
+  types.ts        Input / plan / result types
+  materials.ts    Process parameter chain, strength modes A/B
+  geodesic.ts     Geodesics: angle and pole radius conversion, consistency check
+  netting.ts      Cylinder burst pressure and initial estimate
+  dome.ts         Dome thickness distribution and point-wise burst pressure
+  checker.ts      Aggregated check: scope, weak points, weight reference, suggestions
+  designer.ts     Automatic layup plan generation
+  geometry.ts     Geometry: volume conversion, semi-ellipsoid profile, line-type tangency, joint dimension chain
+  presets.ts      Default presets
+src/ui/         Input panel / auto-design dialog / layup table / dome profile and burst curve / geometry panel / check details
+src/state/      Single source of truth: input + plan -> full pure-function recomputation
+tests/          Baseline tests
+docs/           UI screenshots
 ```
 
-## 注意
+## Notes
 
-- 「缠绕极孔半径」填的是测地线极孔 r_cl，不是 Ⅳ 型瓶阀座通孔半径，两者在几何面板里并列显示。
-- 输入参数与公式来自公开课件与基准算例，用于教学与预设计；工程签发须按 GB/T 35544 等标准与试验验证。
+- The "winding pole radius" is the geodesic pole radius `r_cl`, not the Type IV boss bore radius. Both are shown side by side in the geometry panel.
+- Inputs and formulas come from public course notes and baseline cases, for teaching and preliminary design. Engineering sign-off must follow GB/T 35544 and experimental verification.
 
-## 联系
+## Contact
 
-非商业用途可直接使用；商业用途请先联系 **Z25150070@s.upc.edu.cn**。
+Non-commercial use is allowed. Features are being upgraded; contact **Z25150070@s.upc.edu.cn** for early access.
 
-使用中遇到问题，欢迎提 [Issue](https://github.com/IY724/vessel-layup-designer/issues)，或发邮件至 **Z25150070@s.upc.edu.cn**。
+For issues, open an [Issue](https://github.com/IY724/vessel-layup-designer/issues) or email **Z25150070@s.upc.edu.cn**.
 
-## 开发方式
+## Development
 
-本项目借助 AI 辅助编程（vibecoding）完成开发与文档整理。
+This project was developed and documented with AI-assisted programming (vibecoding).
