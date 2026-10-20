@@ -42,14 +42,10 @@
 
 ## 联系
 
+非商业用途可直接使用；商业用途请先联系 **Z25150070@s.upc.edu.cn**。
+
 使用中遇到问题，欢迎提 [Issue](https://github.com/IY724/vessel-layup-designer/issues)，或发邮件至 **Z25150070@s.upc.edu.cn**。
 
 ## 开发方式
 
 本项目借助 AI 辅助编程（vibecoding）完成开发与文档整理。
-
-## 许可
-
-本软件未采用开源许可证。仅供个人学习与科研交流使用；未经作者书面授权，禁止任何形式的商业使用。
-
-Copyright (c) 2026 IY. All rights reserved. 商业授权请联系 **Z25150070@s.upc.edu.cn**。
