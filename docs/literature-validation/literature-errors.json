@@ -1,0 +1,554 @@
+{
+  "generatedAt": "2026-11-02T02:40:01.219Z",
+  "tol": {
+    "relContinuous": 0.05,
+    "angleDeg": 1,
+    "layers": "≤1制造层或5%"
+  },
+  "cases": [
+    {
+      "id": "cao",
+      "paper": "车载Ⅳ型储氢瓶绕缠绕层优化及有限元分析（曹龙彪 2022，化工设备与管道）",
+      "title": "D348/R174，±13.3→41.4 扩孔 + 环向27层",
+      "notes": [
+        "印刷值口径 = 复合材料单层厚0.3 直接乘纤维发挥强度3385；等效于把纤维强度放大 1/Vf=1.667 倍。",
+        "物理一致口径（tf=0.18×3385 ≡ tc=0.3×σc=2031）下 Pα=158.29、Pθ=127.47，双双低于设计161 —— 论文自身口径导致。",
+        "软件对照两列：printed 口径复现 263.82/212.43/197.87；consistent 口径复算 158.29/127.47。"
+      ],
+      "routeA": [
+        {
+          "key": "pa",
+          "label": "筒身纵向爆破压强 Pα",
+          "printed": 263.8,
+          "computed": 263.822387,
+          "absErr": 0.022387,
+          "relErr": 0.000085,
+          "page": "PDF p5 式(5)-(7)后文",
+          "basis": "Pα=Σ2·cos²α·σfb·hf/R，hf 用 tc=0.3（复材厚度×纤维强度，非物理一致口径）",
+          "pass": true
+        },
+        {
+          "key": "pth",
+          "label": "筒身环向爆破压强 Pθ",
+          "printed": 212.42,
+          "computed": 212.425013,
+          "absErr": 0.005013,
+          "relErr": 0.000024,
+          "page": "PDF p5 式(6)后文",
+          "basis": "同上口径；= 螺旋环向分量54.85 + 环向层157.58",
+          "pass": true
+        },
+        {
+          "key": "head",
+          "label": "封头爆破压强",
+          "printed": 197.8,
+          "computed": 197.86679,
+          "absErr": 0.06679,
+          "relErr": 0.000338,
+          "page": "PDF p5 式(8)后文",
+          "basis": "ks=0.75 × 全螺旋层赤道贡献 = 0.75×263.8",
+          "pass": true
+        }
+      ],
+      "routeB": {
+        "caseId": "cao",
+        "ok": true,
+        "paperPlan": [
+          {
+            "angle": 13.3,
+            "layers": 2
+          },
+          {
+            "angle": 18.4,
+            "layers": 2
+          },
+          {
+            "angle": 23.7,
+            "layers": 4
+          },
+          {
+            "angle": 29.2,
+            "layers": 6
+          },
+          {
+            "angle": 35.1,
+            "layers": 8
+          },
+          {
+            "angle": 41.4,
+            "layers": 10
+          }
+        ],
+        "pass": false,
+        "note": "双向满足但层数差-14层（论文方案余量/口径差异，见 trace 与 notes）。",
+        "verdict": "adjust",
+        "autoPlan": [
+          {
+            "angle": 13,
+            "layers": 6
+          },
+          {
+            "angle": 18,
+            "layers": 4
+          },
+          {
+            "angle": 24,
+            "layers": 2
+          },
+          {
+            "angle": 29,
+            "layers": 2
+          },
+          {
+            "angle": 35,
+            "layers": 2
+          },
+          {
+            "angle": 41,
+            "layers": 2
+          }
+        ],
+        "autoSpiral": 18,
+        "autoHoop": 27,
+        "pa": 175.023868,
+        "pth": 175.117376,
+        "paPass": true,
+        "pthPass": true,
+        "trace": [
+          "极孔反算13.290°；初估采用13.3°。",
+          "公式初估：螺旋14.5640层、环向26.8156层；取用16/27层。",
+          "扩孔选取6组；实际填入角度按整度四舍五入：13/18/24/29/35/41°。",
+          "均分后筒身纵向不足，向单位纵向贡献最大的角度组补2层（±成对）。",
+          "按铺层组交替：螺旋16层、环向27层。",
+          "三次样条与覆盖公式计算6组封头厚度及各组爆压贡献。",
+          "筒身纵向175.02 MPa、环向175.12 MPa；封头经验初估131.27 MPa。"
+        ],
+        "layerErrVsPaper": -14
+      },
+      "invariants": {
+        "integerOk": true,
+        "scaling": true,
+        "bothDirections": {
+          "pa": 263.822387,
+          "pth": 212.425013
+        }
+      },
+      "verdictGivenPlan": "pass",
+      "derived": {
+        "tf": 0.18,
+        "tc": 0.3,
+        "sigmaSpiral": 5641.666667,
+        "sigmaHoop": 5641.666667,
+        "pb": 161
+      }
+    },
+    {
+      "id": "zhang",
+      "paper": "车载复合材料储氢气瓶优化设计与失效模式研究（张宜凯，大连理工）",
+      "title": "R168/r0=40/α14°，K=0.75 并入分母，30+40层",
+      "notes": [
+        "论文为单口径：0.227（单层带厚）直接除厚度得层数、乘层数得厚度；σf=2800 为纤维强度。软件用 Vf=1 表达该单口径（tf=tc=0.227），不动源码。",
+        "K=0.75 在论文式2.17 中并入两式分母，软件用 mode B σ=2800×0.75 等价实现，不加经验乘数。",
+        "环向式（p34 视觉核对）tθ=RP/(2σ)·(2−(1/K)tan²α)，K 在 tan² 项内 → 复算 9.0584，与印刷 9.058 精确吻合（论文自洽，此前误判为矛盾源于把 K 放错位置）。",
+        "螺旋复算 6.6916 vs 印刷 6.695（-0.05%，论文舍入）。"
+      ],
+      "routeA": [
+        {
+          "key": "tSpiral",
+          "label": "螺旋向纤维厚度（30层×0.227）",
+          "printed": 6.695,
+          "computed": 6.81,
+          "absErr": 0.115,
+          "relErr": 0.017177,
+          "page": "PDF p34（印刷页-21）",
+          "basis": "论文 tα=R·Pmax/(2·K·σf·cos²14°)=6.6916→印刷6.695；软件=30×tc=6.81（层数取整+1.7%）",
+          "pass": true
+        },
+        {
+          "key": "tHoop",
+          "label": "环向纤维厚度（40层×0.227）",
+          "printed": 9.058,
+          "computed": 9.08,
+          "absErr": 0.022,
+          "relErr": 0.002429,
+          "page": "PDF p34（印刷页-21）",
+          "basis": "论文式 tθ=RP/(2σ)·(2−(1/K)tan²α)，K 在 tan² 项内 → 复算9.0584（+0.004%，精确）；软件式无K (2−tan²α)→9.1563（+1.07%），软件=40×tc=9.08（+0.24%）",
+          "pass": true
+        },
+        {
+          "key": "nSpiral",
+          "label": "螺旋缠绕层数",
+          "printed": 30,
+          "computed": 30,
+          "absErr": 0,
+          "relErr": 0,
+          "page": "PDF p34",
+          "basis": "6.695/0.227=29.49 → 30层（向上取整）",
+          "pass": true
+        },
+        {
+          "key": "nHoop",
+          "label": "环向缠绕层数",
+          "printed": 40,
+          "computed": 40,
+          "absErr": 0,
+          "relErr": 0,
+          "page": "PDF p34",
+          "basis": "9.058/0.227=39.90 → 40层",
+          "pass": true
+        }
+      ],
+      "routeB": {
+        "caseId": "zhang",
+        "ok": true,
+        "paperPlan": [
+          {
+            "angle": 14,
+            "layers": 30
+          }
+        ],
+        "pass": true,
+        "note": "双向满足且层数与论文一致。",
+        "verdict": "adjust",
+        "autoPlan": [
+          {
+            "angle": 14,
+            "layers": 30
+          }
+        ],
+        "autoSpiral": 30,
+        "autoHoop": 54,
+        "pa": 160.285914,
+        "pth": 158.207043,
+        "paPass": true,
+        "pthPass": true,
+        "trace": [
+          "极孔反算13.774°；初估采用14°。",
+          "公式初估：螺旋29.4786层、环向53.7813层；取用30/54层。",
+          "扩孔选取1组；实际填入角度按整度四舍五入：14°。",
+          "按铺层组交替：螺旋30层、环向54层。",
+          "三次样条与覆盖公式计算1组封头厚度及各组爆压贡献。",
+          "筒身纵向160.29 MPa、环向158.21 MPa；封头经验初估120.21 MPa。"
+        ],
+        "layerErrVsPaper": 0
+      },
+      "invariants": {
+        "integerOk": true,
+        "scaling": true,
+        "bothDirections": {
+          "pa": 160.285914,
+          "pth": 118.482043
+        }
+      },
+      "verdictGivenPlan": "fail",
+      "derived": {
+        "tf": 0.227,
+        "tc": 0.349231,
+        "sigmaSpiral": 2100,
+        "sigmaHoop": 2100,
+        "pb": 157.5
+      }
+    },
+    {
+      "id": "jia",
+      "paper": "塑料内衬复合材料储氢气瓶的结构设计及有限元验证（贾子璇，北京化工大学）",
+      "title": "R142.5/r0=50/α19.5°，σ=1674×0.8，32+42层",
+      "notes": [
+        "论文为单口径：0.325 直接除厚度得层数、乘层数得厚度；[σ]=1674 为纤维许用应力。软件用 Vf=1 表达（tf=tc=0.325）。",
+        "论文内部矛盾：表2-3 印刷 Pmax=157.5，但两个厚度印刷值均按 175 MPa 分子算得（双双吻合0.02%）。",
+        "按论文自述参数（157.5）软件复算 9.43/12.57 → 层数 30/39（取整后）；按 175 才复现 10.48/13.96。",
+        "运行器两口径并列，不把矛盾藏起来。"
+      ],
+      "routeA": [
+        {
+          "key": "tSpiral",
+          "label": "螺旋向缠绕层厚度（32层×0.325）",
+          "printed": 10.48,
+          "computed": 10.4,
+          "absErr": -0.08,
+          "relErr": 0.007634,
+          "page": "PDF p32 表2-3后",
+          "basis": "印刷10.48 按 175 MPa 分子复算10.4781（+0.02%）；按表2-3 Pmax=157.5 复算9.4303（-10.0%）。软件=32×tc=10.40（-0.76%）",
+          "pass": true
+        },
+        {
+          "key": "tHoop",
+          "label": "环向缠绕层厚度（42层×0.325）",
+          "printed": 13.96,
+          "computed": 13.65,
+          "absErr": -0.31,
+          "relErr": 0.022206,
+          "page": "PDF p32 表2-3后",
+          "basis": "印刷13.96 按 175 MPa 分子复算13.9629（+0.02%）；按157.5 复算12.5666（-10.0%）。软件=42×tc=13.65（-2.2%）",
+          "pass": true
+        },
+        {
+          "key": "nSpiral",
+          "label": "螺旋缠绕层数",
+          "printed": 32,
+          "computed": 32,
+          "absErr": 0,
+          "relErr": 0,
+          "page": "PDF p32 表2-4",
+          "basis": "10.48/0.325=32.25 → 32（向下取整/舍位）",
+          "pass": true
+        },
+        {
+          "key": "nHoop",
+          "label": "环向缠绕层数",
+          "printed": 42,
+          "computed": 42,
+          "absErr": 0,
+          "relErr": 0,
+          "page": "PDF p32 表2-4",
+          "basis": "13.96/0.325=42.95 → 42（舍位，非四舍五入43）",
+          "pass": true
+        }
+      ],
+      "routeB": {
+        "caseId": "jia",
+        "ok": true,
+        "paperPlan": [
+          {
+            "angle": 19.5,
+            "layers": 32
+          }
+        ],
+        "pass": false,
+        "note": "双向满足但层数差-2层（论文方案余量/口径差异，见 trace 与 notes）。",
+        "verdict": "adjust",
+        "autoPlan": [
+          {
+            "angle": 20,
+            "layers": 30
+          }
+        ],
+        "autoSpiral": 30,
+        "autoHoop": 49,
+        "pa": 161.821724,
+        "pth": 160.380086,
+        "paPass": true,
+        "pthPass": true,
+        "trace": [
+          "极孔反算20.541°；初估采用19.5°。",
+          "公式初估：螺旋29.0164层、环向48.3332层；取用30/49层。",
+          "扩孔选取1组；实际填入角度按整度四舍五入：20°。",
+          "按铺层组交替：螺旋30层、环向49层。",
+          "三次样条与覆盖公式计算1组封头厚度及各组爆压贡献。",
+          "筒身纵向161.82 MPa、环向160.38 MPa；封头经验初估121.37 MPa。"
+        ],
+        "layerErrVsPaper": -2
+      },
+      "invariants": {
+        "integerOk": true,
+        "scaling": true,
+        "bothDirections": {
+          "pa": 173.69488,
+          "pth": 139.171929
+        }
+      },
+      "verdictGivenPlan": "fail",
+      "derived": {
+        "tf": 0.325,
+        "tc": 0.541667,
+        "sigmaSpiral": 1339.2,
+        "sigmaHoop": 1339.2,
+        "pb": 157.5
+      }
+    },
+    {
+      "id": "zhu",
+      "paper": "Ⅳ型高压储氢气瓶结构设计及优化研究（朱宁 2023，浙江大学）",
+      "title": "R140/r0=36/α15°，σf=2080，扩孔 28+36层（表2.4）",
+      "notes": [
+        "式2.19（p36定义）：螺旋分母带强度利用系数 K（0.7-0.8，朱文取0.7），环向不带 K —— 数值精确闭合。",
+        "层数取整规则：\"纤维缠绕通常为双层交叉缠绕，因此向上取整\"（34.07→36，27.07→28）。",
+        "表2.5 正文写环向 180.98，表尾总计 183.43 —— 论文自相矛盾（180.98 疑为旧稿遗留）。",
+        "表2.5 螺旋行按 R=135 闭合 vs 环向行/总计按 R=140 —— 混合口径已在 initialCase.test.ts 记录。",
+        "朱文 tc=0.3 是复合材料单层厚，[σ]=Xt=2080 是复合材料拉伸强度 —— 与软件 defaultInput 口径一致。"
+      ],
+      "routeA": [
+        {
+          "key": "tSpiralEst",
+          "label": "公式初估螺旋厚度（式2.19, K=0.7, 复材口径）",
+          "printed": 8.12,
+          "computed": 8.115769,
+          "absErr": -0.004231,
+          "relErr": 0.000521,
+          "page": "PDF p92 式2.19（定义见p36）",
+          "basis": "tα=R·Pb/(2·K·[σ]·cos²15°)，K=0.7（p36定义，取值区间0.7-0.8下限）→ 复算8.1158（-0.05%）；软件初估×(1/Vf)÷K 精确等价（软件无K，靠补层保底）",
+          "pass": true
+        },
+        {
+          "key": "tHoopEst",
+          "label": "公式初估环向厚度（式2.19 无K, 复材口径）",
+          "printed": 10.22,
+          "computed": 10.220404,
+          "absErr": 0.000404,
+          "relErr": 0.00004,
+          "page": "PDF p92 式2.19",
+          "basis": "tθ=(2−tan²15°)·R·Pb/(2·[σ]) → 复算10.2204；软件初估×(1/Vf) 精确等价（+0.004%）",
+          "pass": true
+        },
+        {
+          "key": "nSpiral",
+          "label": "公式初估螺旋层数",
+          "printed": 28,
+          "computed": 20,
+          "absErr": -8,
+          "relErr": 0.285714,
+          "page": "PDF p92",
+          "basis": "8.12/0.3=27.07 → 28（双交叉缠绕向上取整到偶）；软件无K初估18.94→20层，差异全部来自K=0.7口径（软件补层循环后24层）",
+          "pass": false
+        },
+        {
+          "key": "nHoop",
+          "label": "公式初估环向层数",
+          "printed": 36,
+          "computed": 35,
+          "absErr": -1,
+          "relErr": 0.027778,
+          "page": "PDF p92",
+          "basis": "10.22/0.3=34.07 → 36（\"向上取整后\"双交叉到偶）；软件35层（差1制造层，达标）",
+          "pass": true
+        },
+        {
+          "key": "pa",
+          "label": "筒身纵向爆破压强（表2.5）",
+          "printed": 211.19,
+          "computed": 203.648563,
+          "absErr": -7.541437,
+          "relErr": 0.035709,
+          "page": "PDF p92 表2.5",
+          "basis": "各螺旋行按 R=135 算（69.00=8.625×8 精确闭合）；软件按 R=140 得 203.65（-3.57%）",
+          "pass": true
+        },
+        {
+          "key": "pth",
+          "label": "筒身环向爆破压强（表2.5总计）",
+          "printed": 183.43,
+          "computed": 183.432861,
+          "absErr": 0.002861,
+          "relErr": 0.000016,
+          "page": "PDF p92 表2.5",
+          "basis": "环向行按 R=140（160.45=4.4571×36 精确）；软件 183.4329（+0.002%）",
+          "pass": true
+        }
+      ],
+      "routeB": {
+        "caseId": "zhu",
+        "ok": true,
+        "paperPlan": [
+          {
+            "angle": 15,
+            "layers": 8
+          },
+          {
+            "angle": 20,
+            "layers": 8
+          },
+          {
+            "angle": 25,
+            "layers": 4
+          },
+          {
+            "angle": 35,
+            "layers": 4
+          },
+          {
+            "angle": 40,
+            "layers": 4
+          }
+        ],
+        "pass": false,
+        "note": "双向满足但层数差-4层（论文方案余量/口径差异，见 trace 与 notes）。",
+        "verdict": "adjust",
+        "autoPlan": [
+          {
+            "angle": 15,
+            "layers": 8
+          },
+          {
+            "angle": 20,
+            "layers": 4
+          },
+          {
+            "angle": 25,
+            "layers": 4
+          },
+          {
+            "angle": 35,
+            "layers": 4
+          },
+          {
+            "angle": 40,
+            "layers": 4
+          }
+        ],
+        "autoSpiral": 24,
+        "autoHoop": 35,
+        "pa": 172.162514,
+        "pth": 176.890172,
+        "paPass": true,
+        "pthPass": true,
+        "trace": [
+          "极孔反算14.901°；初估采用15°。",
+          "公式初估：螺旋18.9368层、环向34.0680层；取用20/35层。",
+          "扩孔选取5组；实际填入角度按整度四舍五入：15/20/25/35/40°。",
+          "均分后筒身纵向不足，向单位纵向贡献最大的角度组补4层（±成对）。",
+          "按铺层组交替：螺旋20层、环向35层。",
+          "三次样条与覆盖公式计算5组封头厚度及各组爆压贡献。",
+          "筒身纵向172.16 MPa、环向176.89 MPa；封头经验初估129.12 MPa。"
+        ],
+        "layerErrVsPaper": -4
+      },
+      "invariants": {
+        "integerOk": true,
+        "scaling": true,
+        "bothDirections": {
+          "pa": 203.648563,
+          "pth": 183.432861
+        }
+      },
+      "verdictGivenPlan": "adjust",
+      "derived": {
+        "tf": 0.18,
+        "tc": 0.3,
+        "sigmaSpiral": 3466.666667,
+        "sigmaHoop": 3466.666667,
+        "pb": 157.5
+      }
+    },
+    {
+      "id": "cao-consistent",
+      "paper": "曹文·物理一致口径对照列",
+      "notes": [
+        "tf=0.3×0.6=0.18 × σf=3385 ≡ tc=0.3 × σc=2031"
+      ],
+      "routeA": [
+        {
+          "key": "pa",
+          "label": "筒身纵向爆破压强 Pα（物理一致口径）",
+          "printed": 158.29,
+          "computed": 158.293432,
+          "absErr": 0.003432,
+          "relErr": 0.000022,
+          "page": "推算：tf=0.3×0.6, σf=3385",
+          "basis": "tc=0.3×σc=2031 ≡ tf=0.18×σf=3385；软件复算即此值",
+          "pass": true
+        },
+        {
+          "key": "pth",
+          "label": "筒身环向爆破压强 Pθ（物理一致口径）",
+          "printed": 127.47,
+          "computed": 127.455008,
+          "absErr": -0.014992,
+          "relErr": 0.000118,
+          "page": "推算",
+          "basis": "同上口径换算（螺旋32.91+环向94.55）",
+          "pass": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { autoDesign, pickAlternate, planPressures } from '../src/core/designer'
 import { runCheck } from '../src/core/checker'
-import { excelBaselineInput, courseInput } from '../src/core/presets'
+import { excelBaselineInput, courseInput, defaultInput } from '../src/core/presets'
 import { initialDesign, expandedLayerCounts, selectedLayerCount } from '../src/core/initialDesign'
 import { buildDomeGroup, domeAt, isDomeGroup } from '../src/core/dome'
 import { prepareExpansion } from '../src/core/expansion'
@@ -42,13 +42,14 @@ describe('课件单角度初估接入扩孔设计', () => {
   it('旧手填初估记录不再影响计算或扩孔；层数只在最终铺层表修改', () => {
     const input = { ...base, constraint: { ...base.constraint, manualSpiralEstimate: 40, manualHoopEstimate: 32 } }
     const { out, result } = generate(input)
-    expect(result.cylinder.spiralLayers).toBe(16)
+    // 均分16层纵向欠强，自动向10°组补±成对4层（6,2,…,2）后双向满足。
+    expect(result.cylinder.spiralLayers).toBe(20)
     expect(result.cylinder.hoopLayers).toBe(24)
-    expect(out.plan.spiral.map(g => g.layers)).toEqual(Array(8).fill(2))
+    expect(out.plan.spiral.map(g => g.layers)).toEqual([6,2,2,2,2,2,2,2])
     expect(out.plan.groups?.map(g => g.type)).toEqual(Array.from({ length:16 }, (_,i) => i%2 ? 'hoop' : 'spiral'))
-    const edited = { ...input, plan: planFromRows(layupGroups(out.plan).map((g,i) => i===0 ? {...g,layers:4} : i===1 ? {...g,layers:6} : g)) }
+    const edited = { ...input, plan: planFromRows(layupGroups(out.plan).map((g,i) => i===0 ? {...g,layers:g.layers+2} : i===1 ? {...g,layers:g.layers+3} : g)) }
     const changed = runCheck(edited)
-    expect(changed.cylinder.spiralLayers).toBe(18)
+    expect(changed.cylinder.spiralLayers).toBe(22)
     expect(changed.cylinder.hoopLayers).toBe(27)
     expect(changed.cylinder.pa).toBeGreaterThan(result.cylinder.pa)
     expect(changed.cylinder.pth).toBeGreaterThan(result.cylinder.pth)
@@ -58,7 +59,7 @@ describe('课件单角度初估接入扩孔设计', () => {
     const allocation = expandedLayerCounts(base, 8), { out, result } = generate()
     expect(allocation).toMatchObject({ spiral:16, added:0, layers:Array(8).fill(2) })
     expect(out.plan.spiral.map(g => g.angle)).toEqual(base.constraint.candidates.map(Math.round))
-    expect(result.cylinder.spiralLayers).toBe(16)
+    expect(result.cylinder.spiralLayers).toBe(20) // 均分16层后纵向补4层
     const lower = { ...base, requirement: { ...base.requirement, pb:20 } }
     expect(generate(lower).out.trace.join(' ')).toContain('分配为16层')
     expect(result.cylinder.hoopLayers).toBe(initialDesign(base).hoop)
@@ -67,8 +68,26 @@ describe('课件单角度初估接入扩孔设计', () => {
     expect([selectedLayerCount(14.24755,true), selectedLayerCount(15,true), selectedLayerCount(23.49516,false)]).toEqual([16,16,24])
     const data = { ...base, constraint: { ...base.constraint, forceEvenSpiral:false, manualSpiralEstimate:17, manualHoopEstimate:23 } }
     const { result } = generate(data)
-    expect(result.cylinder.spiralLayers).toBe(16)
+    expect(result.cylinder.spiralLayers).toBe(20)
     expect(result.cylinder.hoopLayers).toBe(24)
+  })
+  it('扩孔后均分的螺旋层须双向满足设计爆压：不足时自动补层并保持候选角不变', () => {
+    // 缺陷回归：初估按 alphaRef（小角）定总层数，均分到更大的实际角度后
+    // cos²α 变小，筒身纵向欠强（default 案例 pa 138.89 < 157.5）。
+    for (const [name, input] of [['默认78L', defaultInput()], ['课件基准', excelBaselineInput()]] as const) {
+      const { out, result } = generate(input)
+      const d = result.derived
+      expect(result.cylinder.paPass, `${name} 纵向 ${result.cylinder.pa.toFixed(2)} < ${d.pb}`).toBe(true)
+      expect(result.cylinder.pthPass, `${name} 环向 ${result.cylinder.pth.toFixed(2)} < ${d.pb}`).toBe(true)
+      // 补层只加层数、不改角度选择，且保持±成对
+      const spiralByAngle = new Map(input.constraint.candidates.map(a => [Math.round(a), 0]))
+      for (const g of out.plan.spiral) spiralByAngle.set(g.angle, (spiralByAngle.get(g.angle) ?? 0) + g.layers)
+      for (const a of input.constraint.candidates.map(Math.round)) {
+        expect(spiralByAngle.get(a) ?? 0, `${name} 角度${a}°应保留`).toBeGreaterThan(0)
+      }
+      expect(result.cylinder.spiralLayers % 2, `${name} 螺旋应为±成对`).toBe(0)
+      expect(result.cylinder.spiralLayers).toBeGreaterThanOrEqual(initialDesign(input).spiral)
+    }
   })
   it('扩孔后逐组求解三次样条、逐点厚度和爆压贡献相加；欠强如实返回校核结果', () => {
     const { out, result } = generate()
@@ -84,8 +103,12 @@ describe('课件单角度初估接入扩孔设计', () => {
     expect(p.tTotal).toBeCloseTo(p.tGroups.reduce((s,n)=>s+n,0), 12)
     expect(p.pTotal).toBeCloseTo(p.pGroups.reduce((s,n)=>s+n,0)*base.requirement.ks, 12)
     expect(out.verdict).toBe(result.verdict)
-    expect(result.cylinder.paPass).toBe(false)
-    expect(out.verdict).not.toBe('pass')
+    // 自动方案补层后双向满足；手工欠强方案（去掉补层）仍由校核如实返回失败。
+    const under = { ...base, plan: planFromRows(layupGroups(out.plan).map(g => g.type==='spiral' ? {...g, layers: Math.max(2, g.layers-4)} : g)) }
+    const worse = runCheck(under)
+    expect(worse.cylinder.spiralLayers).toBe(result.cylinder.spiralLayers - 4)
+    expect(worse.cylinder.paPass).toBe(false)
+    expect(worse.verdict).toBe('fail')
     expect(planPressures(base,out.plan).domeMin).toBe(result.dome.minP)
   })
   it('未选角或无效上游计算角度阻止生成', () => {
@@ -126,7 +149,7 @@ describe('课件单角度初估接入扩孔设计', () => {
       expect(initial.pth).toBeGreaterThanOrEqual(pb)
     }
   })
-  it('无效的上游压力、角度或几何不会显示初算满足', () => {
+  it('无效上游压力、角度或几何不会显示初算满足', () => {
     for(const data of [
       {...base, requirement:{...base.requirement,pb:0}},
       {...base, material:{...base.material,vf:0}},

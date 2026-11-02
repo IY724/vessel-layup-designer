@@ -4,6 +4,7 @@ import { deriveParams } from './materials'
 import { runCheck } from './checker'
 import { defaultAngles } from './expansion'
 import { interleavePlan } from './layup'
+import { paUnit } from './netting'
 import { expandedLayerCounts } from './initialDesign'
 
 export type AutoResult =
@@ -40,7 +41,19 @@ export function autoDesign(input: DesignInput): AutoResult {
   trace.push(`扩孔选取${angles.length}组；实际填入角度按整度四舍五入：${angles.join('/')}°。`)
   if (allocation.added) trace.push(`${angles.length}个螺旋组每组至少2层，分配为${allocation.spiral}层。`)
   // 均分是可手改的默认排法；课件没有给出自动权重或最优层数算法。
-  const plan = interleavePlan(angles.map((angle, i) => ({ angle, layers: allocation.layers[i] })), initial.hoop)
+  // 初估按 αref（小角）定总层数，均分到更大的实际角度后 cos²α 变小，纵向可能欠强；
+  // 此时向单层纵向贡献最大的角度组补±成对的层，不改变角度选择、环向层数与行序。
+  const layers = [...allocation.layers]
+  const perLayer = angles.map(a => paUnit(a, d.tf, d.sigmaSpiral, input.geometry.R))
+  let topUp = 0
+  while (perLayer.reduce((s, v, i) => s + v * layers[i], 0) < d.pb) {
+    const best = perLayer.reduce((bi, v, i) => (v > perLayer[bi] ? i : bi), 0)
+    if (!(perLayer[best] > 0)) return { ok: false, reason: '候选螺旋角无法提供纵向承载，无法自动补层', trace }
+    layers[best] += 2
+    topUp += 2
+  }
+  if (topUp) trace.push(`均分后筒身纵向不足，向单位纵向贡献最大的角度组补${topUp}层（±成对）。`)
+  const plan = interleavePlan(angles.map((angle, i) => ({ angle, layers: layers[i] })), initial.hoop)
   const result = runCheck({ ...input, plan })
   if (result.dome.failedGroups.length) {
     return { ok: false, reason: `封头厚度计算失败：${result.dome.failedGroups.map(g => `${g.angle.toFixed(3)}° ${g.reason}`).join('；')}`, trace }
