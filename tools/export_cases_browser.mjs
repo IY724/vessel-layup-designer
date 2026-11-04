@@ -7,7 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const out = path.resolve(root, '../_work/design_case')
+const out = path.resolve(root, 'output/design_case')
 const inputs = JSON.parse(await readFile(path.join(out, 'inputs.json'), 'utf8'))
 const mapping = { reference: '案例-0参考铺层.xlsx', auto: '案例-A自动生成.xlsx', final: '案例-B定稿.xlsx' }
 

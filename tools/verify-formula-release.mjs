@@ -11,7 +11,7 @@ import ExcelJS from 'exceljs'
 const root=fileURLToPath(new URL('../',import.meta.url))
 const {version:packageVersion}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'))
 const version=packageVersion.split('.').slice(0,2).join('.')  // 对外标识：1.0.0 → 1.0
-const out=path.resolve(root,'../_公式同步_20261015/发布检查')
+const out=path.resolve(root,'output/formula-sync')
 await mkdir(out,{recursive:true})
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex')
 const asar=path.join(root,'release/win-unpacked/resources/app.asar')

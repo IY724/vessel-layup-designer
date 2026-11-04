@@ -11,7 +11,7 @@ source = Path(sys.argv[1]) if len(sys.argv) > 1 else root.parent / '00_原始参
 doc = fitz.open(source)
 source_hash = sha256(source.read_bytes()).hexdigest()
 assets = root / 'src/assets/report-figures'
-review = root.parent / '_work/pdf_20261017/source-figures'
+review = root / 'output/paper-figures-source'
 assets.mkdir(parents=True, exist_ok=True)
 review.mkdir(parents=True, exist_ok=True)
 figures = {}

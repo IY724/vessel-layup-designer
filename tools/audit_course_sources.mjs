@@ -4,7 +4,7 @@ import crypto from 'node:crypto'
 import XLSX from 'xlsx'
 
 const root = path.resolve('..')
-const out = path.join(root, '_核对记录_20261015')
+const out = path.join(root, 'output/course-audit')
 fs.mkdirSync(out, { recursive: true })
 function walk(dir) { return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]) }
 const files = walk(path.join(root, '00_原始参考资料')).filter(p => p.endsWith('.xls'))

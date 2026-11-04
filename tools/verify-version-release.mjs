@@ -10,7 +10,7 @@ import { extractFile } from '@electron/asar'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const deliver = path.resolve(root, '../交付')
 const releaseDirectory = path.resolve(root, process.argv[2] ?? 'release')
-const out = path.resolve(root, process.argv[3] ?? '../_版本统一_20261015')
+const out = path.resolve(root, process.argv[3] ?? 'output/version-release')
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex')
 
 const checks = []
@@ -57,11 +57,15 @@ await step('页面 SHA-256', () => htmlSha)
 
 // 5. 安装包产物按 1.0 命名，且构建目录与交付目录不留旧版本包
 const artifacts = ['安装包', '免安装'].map((kind) => `气瓶铺层设计-${label}-Windows-x64-${kind}.exe`)
+// 交付只随附网页版与免安装版；安装包留在构建目录，不复制到交付。
+const delivered = ['气瓶铺层设计软件-网页版.html', `气瓶铺层设计-${label}-Windows-x64-免安装.exe`]
 await step('安装包产物齐备', async () => {
   for (const name of artifacts) {
     assert.ok((await fs.stat(path.join(releaseDirectory, name))).isFile(), `缺少构建产物：${name}`)
-    assert.ok((await fs.stat(path.join(deliver, name))).isFile(), `缺少 交付/${name}`)
     assert.ok((await fs.stat(path.join(releaseDirectory, name))).size > 1e8, `${name} 体积异常，可能只是便携版外壳`)
+  }
+  for (const name of delivered) {
+    assert.ok((await fs.stat(path.join(deliver, name))).isFile(), `缺少 交付/${name}`)
   }
   return artifacts
 })

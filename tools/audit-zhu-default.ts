@@ -17,4 +17,4 @@ const summary={
     pthPaper:183.43,pthDifference:result.cylinder.pth-183.43,equatorPaper:168.47,equatorDifference:eq.pTotal-168.47,
     maximumThicknessPaper:19.1,maximumThicknessDifference:max.tTotal-19.1 },
 }
-const out=resolve('../_work/default_order_20261017');mkdirSync(out,{recursive:true});writeFileSync(resolve(out,'朱宁默认参数复算.json'),JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2))
+const out=resolve('output/default-order');mkdirSync(out,{recursive:true});writeFileSync(resolve(out,'朱宁默认参数复算.json'),JSON.stringify(summary,null,2));console.log(JSON.stringify(summary,null,2))

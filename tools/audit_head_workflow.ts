@@ -27,7 +27,7 @@ const output = {source:path,sha256:createHash('sha256').update(bytes).digest('he
   exportedPressureFormula:actual.Sheets['封头-10°'].L23.f,radiusRange:[totals[0].r,totals.at(-1)!.r],groups:report,totals,
   maxTotalThicknessDifference:Math.max(...totals.map(p=>Math.abs(p.actualThickness-p.sourceThickness))),
   maxTotalPressureDifference:Math.max(...totals.map(p=>Math.abs(p.actualPressure-p.correctedPressure)))}
-const outputPath=resolve('../_铺层改进_20261016/封头逐角流程核对.json')
+const outputPath=resolve('output/封头逐角流程核对.json')
 writeFileSync(outputPath,JSON.stringify(output,null,2))
 console.log(JSON.stringify({...output,groups:report.map(({rows,...g})=>g),totals:undefined,outputPath},null,2))
 if(output.maxTotalThicknessDifference>1e-7 || output.maxTotalPressureDifference>1e-7)process.exitCode=1

@@ -2,7 +2,7 @@
  * design_case.ts — 设计案例：用网站同一套内核代码走完整设计流程，导出与界面「导出 Excel」字节一致的 .xlsx
  *
  * 运行：npx vite-node tools/design_case.ts
- * 产物：../_work/design_case/{case.json, 案例-0参考铺层.xlsx, 案例-A自动生成.xlsx, 案例-B定稿.xlsx}
+ * 产物：output/design_case/{case.json, 案例-0参考铺层.xlsx, 案例-A自动生成.xlsx, 案例-B定稿.xlsx}
  *
  * 流程与界面一一对应：
  *   ① 几何页「容积与尺寸互算」：已知容积 140 L → 反算筒身长度 l
@@ -25,7 +25,7 @@ import { workbookBytes } from '../src/export/excel'
 import type { CheckResult, DesignInput } from '../src/core/types'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const OUT = resolve(here, '../../_work/design_case')
+const OUT = resolve(here, '../output/design_case')
 mkdirSync(OUT, { recursive: true })
 
 // ── ① 容积与尺寸互算 ──────────────────────────────────────────────────────────

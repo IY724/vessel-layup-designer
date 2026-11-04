@@ -4,7 +4,7 @@
  * 断言值来源（全部为 Excel 缓存值，非人工推算）：
  *   强度设计与计算.xls  → CYL_* 常量
  *   封头厚度计算公式最终-演示版.xls → EXCEL_T / EXCEL_P_RAW 与 DOME_10_* 常量
- * 复现工具：仓库外 _work/compare_model.py（逐点 144 格点对账）
+ * 逐点 144 格点的对账结论即上述断言值本身
  */
 import { describe, expect, it } from 'vitest'
 import { excelBaselineInput, blankInput } from '../src/core/presets'

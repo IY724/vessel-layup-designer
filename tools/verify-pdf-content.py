@@ -8,7 +8,7 @@ import fitz
 from hashlib import sha256
 
 root = Path(__file__).resolve().parents[1]
-out = Path(sys.argv[1]) if len(sys.argv) > 1 else root.parent / '_work/pdf_20261017/qa'
+out = Path(sys.argv[1]) if len(sys.argv) > 1 else root / 'output/qa/pdf'
 reports = {}
 normalized = []
 paper_figures = json.loads((root / 'src/assets/report-figures/zhuFigures.json').read_text(encoding='utf-8'))

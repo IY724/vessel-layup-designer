@@ -6,7 +6,7 @@ import path from 'node:path'
 import assert from 'node:assert/strict'
 
 const executable=path.resolve(process.argv[2])
-const out=path.resolve(process.env.PDF_QA_OUT || '../_work/pdf_20261017/qa')
+const out=path.resolve(process.env.PDF_QA_OUT || 'output/qa/pdf-portable')
 await mkdir(out,{recursive:true})
 const env={...process.env};delete env.ELECTRON_RUN_AS_NODE
 const port=9479

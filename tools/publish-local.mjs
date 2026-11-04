@@ -3,20 +3,17 @@ import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-// 只更新网页、桌面包与三个案例；不触碰仍在编辑的软著材料。
+// 只更新网页与免安装版；安装包留在 release/，案例表由软件界面即时导出。
 const root = fileURLToPath(new URL('../', import.meta.url))
 const destination = path.resolve(root, '../交付')
 const packageVersion = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version
 // 对外版本标识 = 主.次（1.0.0 → 1.0），与界面、安装包文件名保持一致。
 const version = packageVersion.split('.').slice(0, 2).join('.')
 const releaseDirectory = process.argv[2] ?? 'release'
+const portable = `气瓶铺层设计-${version}-Windows-x64-免安装.exe`
 const files = [
   ['dist/index.html', '气瓶铺层设计软件-网页版.html'],
-  ...['安装包', '免安装'].map((kind) => {
-    const name = `气瓶铺层设计-${version}-Windows-x64-${kind}.exe`
-    return [path.join(releaseDirectory, name), name]
-  }),
-  ...['案例-0参考铺层.xlsx', '案例-A自动生成.xlsx', '案例-B定稿.xlsx'].map((name) => [`../_work/design_case/${name}`, name]),
+  [path.join(releaseDirectory, portable), portable],
 ]
 for (const [source] of files) {
   if (!(await stat(path.resolve(root, source))).isFile()) throw new Error(`缺少构建产物：${source}`)

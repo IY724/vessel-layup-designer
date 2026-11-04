@@ -6,7 +6,7 @@ import path from 'node:path'
 import assert from 'node:assert/strict'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const out = path.resolve(root, process.env.PDF_QA_OUT || '../_work/pdf_20261017/qa')
+const out = path.resolve(root, process.env.PDF_QA_OUT || 'output/qa/pdf')
 await mkdir(out, { recursive: true })
 const desktopPath = process.argv[2] === '--web' ? null : process.argv[2]
 const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE

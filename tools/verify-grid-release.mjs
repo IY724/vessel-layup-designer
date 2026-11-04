@@ -8,7 +8,7 @@ import { extractFile } from '@electron/asar'
 import ExcelJS from 'exceljs'
 
 const root=fileURLToPath(new URL('../',import.meta.url))
-const out=path.resolve(root,'../_网格线同步_20261015')
+const out=path.resolve(root,'output/grid-sync')
 const {version:packageVersion}=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'))
 const version=packageVersion.split('.').slice(0,2).join('.')  // 对外标识：1.0.0 → 1.0
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex')

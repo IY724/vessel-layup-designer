@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import ExcelJS from 'exceljs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const out = path.resolve(root, process.env.DESKTOP_QA_OUT || '../_work/desktop_qa')
+const out = path.resolve(root, process.env.DESKTOP_QA_OUT || 'output/qa/desktop')
 await mkdir(out, { recursive: true })
 const executablePath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'release/win-unpacked/VesselLayupDesigner.exe')
 const env = { ...process.env }
