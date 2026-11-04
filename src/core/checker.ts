@@ -127,8 +127,25 @@ export function runCheck(input: DesignInput): CheckResult {
   )
 
   // ---- 诊断 ----
+  // 输入有效性是判定前提；正值工况仍沿用原Excel计算，不增设折减或拟合项。
+  const positiveInputs: Array<[string, number]> = [
+    ['缠绕基准半径',R], ['封头深度',geometry.headShortAxis], ['筒身长度',geometry.cylLength],
+    ['目标容积',geometry.volumeL], ['纤维单层厚度',derived.tf], ['复材单层厚度',derived.tc],
+    ['总带宽',derived.bandTotal], ['螺旋发挥强度',derived.sigmaSpiral],
+    ['环向发挥强度',derived.sigmaHoop], ['复材层强度',derived.sigmaComposite],
+    ['设计爆破压强',derived.pb], ['应力平衡系数',input.requirement.ks],
+  ]
+  const invalidNames=positiveInputs.filter(([,v])=>!Number.isFinite(v)||v<=0).map(([name])=>name)
+  if (invalidNames.length) diagnoses.push({ level:'error', text:`输入无效：${invalidNames.join('、')}必须为有限正数。` })
+  if (!(input.material.vf>0 && input.material.vf<1)) diagnoses.push({level:'error',text:'纤维体积含量必须大于0且小于1。'})
+  if (!(Number.isFinite(geometry.linerThickness) && geometry.linerThickness>=0
+    && geometry.linerThickness<R && geometry.linerThickness<geometry.headShortAxis)) {
+    diagnoses.push({level:'error',text:'内衬厚度须非负，且小于外半径和封头外表面深度。'})
+  }
+  if (!(derived.r0>0 && derived.r0<R)) diagnoses.push({level:'error',text:'缠绕极孔半径必须大于0且小于缠绕基准半径。'})
   const angles = spiralGroups(plan).filter((g) => g.active !== false && g.layers > 0 && g.angle > 0 && g.angle < 90).map((g) => g.angle)
   for (const g of activeGroups(plan)) {
+    if (!(Number.isInteger(g.layers) && g.layers>0)) diagnoses.push({level:'error',text:'启用铺层的层数必须为正整数。'})
     if (!Number.isFinite(g.angle) || g.angle < 0 || g.angle > 90 || (g.type === 'spiral' && (g.angle <= 0 || g.angle >= 90))) {
       diagnoses.push({ level: 'error', text: `${g.type === 'spiral' ? '螺旋' : '环向'}角度 ${g.angle}° 无效：螺旋应在0°与90°之间，环向可取0°至90°。` })
     }
@@ -168,7 +185,7 @@ export function runCheck(input: DesignInput): CheckResult {
       ? 'pass'
       : 'adjust'
 
-  const advice = buildAdvice(input, head)
+  const advice = invalidNames.length ? {kind:'none' as const,text:'请先修正无效输入。',variants:[]} : buildAdvice(input, head)
 
   return { derived, cylinder, dome, head, consistency, weight, verdict, diagnoses, advice }
 }

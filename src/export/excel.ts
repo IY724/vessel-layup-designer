@@ -7,6 +7,7 @@ import { coverageAt, domeAt, groupPressure, layerThickness, solve4, splineAt } f
 import { COURSE_PI, courseGrid } from '../core/course'
 import { layupGroups, spiralGroups } from '../core/layup'
 import { initialDesign } from '../core/initialDesign'
+import { imprint } from '../core/docStamp'
 
 type WS = XLSX.WorkSheet
 
@@ -317,7 +318,7 @@ function summarySheet(input: DesignInput, res: CheckResult): WS {
     if (b !== undefined) put(ws, `B${r}`, b)
     r++
   }
-  line('复合材料气瓶缠绕铺层设计系统 — 设计方案汇总', '')
+  line('复合材料气瓶缠绕铺层设计软件 — 设计方案汇总', '')
   line('导出时间', new Date().toLocaleString('zh-CN'))
   line('')
   line('【设计条件】')
@@ -492,6 +493,7 @@ function cacheResults(wb: XLSX.WorkBook, input: DesignInput, res: CheckResult, g
 /** 供测试：只生成 workbook 不下载 */
 export function buildWorkbook(input: DesignInput, res: CheckResult) {
   const wb = XLSX.utils.book_new()
+  wb.Props = { Title: '气瓶铺层计算书', Subject: '复合材料气瓶缠绕铺层设计软件', Author: imprint, LastAuthor: imprint, Company: imprint }
   XLSX.utils.book_append_sheet(wb, summarySheet(input, res), '工况与气瓶参数')
   XLSX.utils.book_append_sheet(wb, cylinderSheet(input, res), '筒身强度设计与计算')
   const grid = headGrid(res.dome.rFirst, input.geometry.R)

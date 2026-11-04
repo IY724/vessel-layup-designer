@@ -119,7 +119,7 @@ describe('实际导出文件',()=>{
     const line=book.getWorksheet('线型切点设计')!
     expect(line.getCell('C15').formula).toBe('ASIN(B9/B7)/PI()*180')
     expect(line.getCell('C15').result as number).toBeCloseTo(Math.asin(res.derived.r0/input.geometry.R)*180/Math.PI,9)
-    const vp={R_in:input.geometry.R,l:input.geometry.cylLength,lambda:lambdaFromDepth(input.geometry.R,input.geometry.headShortAxis),r0:res.derived.r0,Kf:0.8}
+    const vp={R:input.geometry.R,l:input.geometry.cylLength,lambda:lambdaFromDepth(input.geometry.R,input.geometry.headShortAxis),r0:res.derived.r0,Kf:0.8}
     expect(line.getCell('C19').formula).toBe('2*C18')
     expect(line.getCell('C19').result as number).toBeCloseTo(windingTurns(vp).roundTrip,9)
     const calc=book.getWorksheet('铺层角度计算')!

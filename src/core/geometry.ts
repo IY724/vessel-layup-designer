@@ -15,30 +15,32 @@
  *       Ⅳ型瓶（塑料内胆），**不采用**。Ⅳ型瓶瓶口/接头区尺寸按既有 Abaqus Ⅳ型瓶插件的
  *       接头设计口径另行定义，见 JointParams。
  *
- * 半径口径（重要，勿与铺层设计的 R 混用）：
- *   本模块一律用 **内表面（芯模/内胆外表面）半径 R_in**；铺层设计里的 R 是缠绕层受力计算半径。
- *   两者关系：R_in = R − 铺层内表面偏移，由用户分别填写并在界面标注。
+ * 半径口径：R 为内衬外半径（缠绕基准半径），强度与线型使用同一 R。
+ *   容积按式(2.6)扣除内衬厚度 t：径向半轴 R−t，轴向半轴 R/λ−t。
+ *   独立接头模型 JointParams 中的 R_in 则仍明确表示内半径。
  */
 import { DEG, RAD } from './geodesic'
 
 const clamp1 = (x: number) => Math.max(-1, Math.min(1, x))
 
 export interface VolumeParams {
-  /** 筒身段半径 R_in (mm)（Excel 口径：与铺层设计 R 同值，容积按此半径计） */
-  R_in: number
+  /** 内衬外半径 / 缠绕基准半径 R (mm)，与强度输入一致 */
+  R: number
   /** 筒身段长度 l (mm) */
   l: number
-  /** 封头轴比 λ = a/b（a 径向半轴=R_in，b 轴向半轴=封头深度）。标准椭圆 2，郑强取 √2，一般 ≤2.5 */
+  /** 内衬外表面轴比 λ = R/h；标准椭圆为2 */
   lambda: number
   /** 极孔半径 r₀ (mm) */
   r0: number
   /** 阀座占用使封头实际容积折减的系数 K_f（朱宁取 0.8） */
   Kf: number
+  /** 内衬厚度 t (mm)；旧课程无壁厚几何缺省为0 */
+  linerThickness?: number
 }
 
 /** 封头轴向短半轴 b（=封头深度 h）；朱宁式(2.6) 原文写法见 computeVolumeZhuLiteral */
 export function headMinorAxis(p: VolumeParams): number {
-  return p.R_in / p.lambda
+  return p.R / p.lambda
 }
 
 export interface VolumeParts {
@@ -49,7 +51,7 @@ export interface VolumeParts {
   totalMm3: number
   /** 容积 (L) */
   totalL: number
-  /** 封头轴向短半轴 b (mm) */
+  /** 容积封头轴向半轴 b = R/λ−t (mm) */
   b: number
   /** 封头深度（含极孔区）用的轴比 */
   lambda: number
@@ -57,31 +59,27 @@ export interface VolumeParts {
 
 /** 容积正算（朱宁式2.6：封头半椭球 + 筒身圆柱；Ⅳ型瓶接头区见 JointParams） */
 export function computeVolume(p: VolumeParams): VolumeParts {
-  const a = p.R_in
-  const b = a / p.lambda
-  const headMm3 = ((4 * Math.PI) / 3) * p.Kf * a * a * b
-  const cylMm3 = Math.PI * a * a * p.l
+  const t = p.linerThickness ?? 0
+  const a = p.R - t
+  const b = p.R / p.lambda - t
+  const valid = t>=0 && a>0 && b>0 && p.lambda>0 && p.l>0 && p.Kf>0
+  const headMm3 = valid ? ((4 * Math.PI) / 3) * p.Kf * a * a * b : NaN
+  const cylMm3 = valid ? Math.PI * a * a * p.l : NaN
   const totalMm3 = headMm3 + cylMm3
   return { headMm3, cylMm3, totalMm3, totalL: totalMm3 / 1e6, b, lambda: p.lambda }
 }
 
 /** 朱宁式(2.6) 的原文写法（b = D/(2λ) − t，即把 λ 先作用在外径上再减壁厚） */
-export function computeVolumeZhuLiteral(p: VolumeParams, t: number): VolumeParts {
-  const D = 2 * (p.R_in + t)
-  const a = D / 2 - t
-  const b = D / (2 * p.lambda) - t
-  const headMm3 = ((4 * Math.PI) / 3) * p.Kf * a * a * b
-  const cylMm3 = Math.PI * a * a * p.l
-  const totalMm3 = headMm3 + cylMm3
-  return { headMm3, cylMm3, totalMm3, totalL: totalMm3 / 1e6, b, lambda: p.lambda }
+export function computeVolumeZhuLiteral(p: VolumeParams, t = p.linerThickness ?? 0): VolumeParts {
+  return computeVolume({ ...p, linerThickness: t })
 }
 
-export type UnknownField = 'none' | 'l' | 'R_in' | 'lambda' | 'volumeL'
+export type UnknownField = 'none' | 'l' | 'R' | 'lambda' | 'volumeL'
 
 /**
  * 容积↔尺寸互算：指定一个未知量，由其余量解出它（朱宁式2.7 是其 l 未知时的闭式特例）。
  *  - 'l'      : 闭式
- *  - 'R_in'   : 单调增，二分求根
+ *  - 'R'      : 单调增，二分求根
  *  - 'lambda' : 单调减，二分求根
  *  - 'volumeL': 正算
  * targetL 为目标容积（L）。返回补全后的完整参数与容积分解。
@@ -93,28 +91,29 @@ export function solveGeometry(
 ): { params: VolumeParams; parts: VolumeParts; solved: string; ok: boolean } {
   const targetMm3 = targetL * 1e6
   if (unknown === 'none' || unknown === 'volumeL') {
-    return { params: p, parts: computeVolume(p), solved: `${computeVolume(p).totalL.toFixed(3)} L（正算）`, ok: true }
+    const parts=computeVolume(p), ok=Number.isFinite(parts.totalL)&&parts.totalL>0
+    return { params: p, parts, solved: ok?`${parts.totalL.toFixed(3)} L（正算）`:'几何尺寸无效，请检查外半径、封头深度和壁厚。', ok }
   }
   if (unknown === 'l') {
     const v = computeVolume(p)
-    const l = (targetMm3 - v.headMm3) / (Math.PI * p.R_in ** 2)
+    const l = (targetMm3 - v.headMm3) / (Math.PI * (p.R - (p.linerThickness ?? 0)) ** 2)
     const ok = Number.isFinite(l) && l > 0
     const params = { ...p, l: ok ? l : p.l }
     return { params, parts: computeVolume(params), solved: `筒身长度 l = ${l.toFixed(2)} mm`, ok }
   }
-  if (unknown === 'R_in') {
-    const f = (R: number) => computeVolume({ ...p, R_in: R }).totalMm3 - targetMm3
-    const root = bisect(f, 1, 2000)
+  if (unknown === 'R') {
+    const f = (R: number) => computeVolume({ ...p, R }).totalMm3 - targetMm3
+    const root = bisect(f, Math.max(1, (p.linerThickness ?? 0) * Math.max(1, p.lambda) + 1e-6), 2000)
     if (root === null) return { params: p, parts: computeVolume(p), solved: '筒身段半径无解（目标容积过小或过大）', ok: false }
-    const params = { ...p, R_in: root }
+    const params = { ...p, R: root }
     return { params, parts: computeVolume(params), solved: `筒身段半径 R = ${root.toFixed(2)} mm（筒身直径 D = ${(2 * root).toFixed(1)} mm）`, ok: true }
   }
   // lambda：b = R/λ，λ↑ → 封头变浅 → 容积单调减
   const f = (lam: number) => computeVolume({ ...p, lambda: lam }).totalMm3 - targetMm3
-  const root = bisect(f, 1.0001, 20)
+  const root = bisect(f, 1.0001, Math.min(20, p.linerThickness ? p.R / p.linerThickness - 1e-6 : 20))
   if (root === null) return { params: p, parts: computeVolume(p), solved: '封头轴比无解（λ 超出 1~20）', ok: false }
   const params = { ...p, lambda: root }
-  return { params, parts: computeVolume(params), solved: `封头轴比 λ = ${root.toFixed(3)}（封头深度 b = ${(root ? params.R_in / root : 0).toFixed(1)} mm）`, ok: true }
+  return { params, parts: computeVolume(params), solved: `封头轴比 λ = ${root.toFixed(3)}（外表面封头深度 h = ${(root ? params.R / root : 0).toFixed(1)} mm）`, ok: true }
 }
 
 /** 区间二分求根（要求 f 在区间端点异号；单调问题足够用） */
@@ -141,13 +140,13 @@ function bisect(f: (x: number) => number, lo: number, hi: number): number | null
 }
 
 /** 由封头深度 b 反推轴比 λ（Excel 里 C14「封头短半轴对应长度」就是这个 b） */
-export function lambdaFromDepth(R_in: number, b: number): number {
-  return R_in / b
+export function lambdaFromDepth(R: number, b: number): number {
+  return R / b
 }
 
 /** 由轴比 λ 求封头深度 b */
-export function depthFromLambda(R_in: number, lambda: number): number {
-  return R_in / lambda
+export function depthFromLambda(R: number, lambda: number): number {
+  return R / lambda
 }
 
 export interface MeridianPoint {
@@ -162,11 +161,11 @@ export interface MeridianPoint {
 }
 
 /**
- * 内表面子午线（半椭球）：z(r) = b·√(1 − (r/a)²)，a = R_in，b = a/λ。
+ * 内衬外表面子午线（半椭球）：z(r) = b·√(1 − (r/a)²)，a = R，b = a/λ。
  * 同时给出两篇论文用于壳分析的主曲率半径（朱宁式2.20 的椭球闭式）。
  */
 export function meridianProfile(p: VolumeParams, samples = 80): MeridianPoint[] {
-  const a = p.R_in
+  const a = p.R
   const b = a / p.lambda
   const out: MeridianPoint[] = []
   for (let i = 0; i < samples; i++) {
@@ -187,11 +186,11 @@ export function meridianProfile(p: VolumeParams, samples = 80): MeridianPoint[] 
 }
 
 /**
- * 封头内表面积（回转面）：A = 2π∫[r0,R_in] r·ds，ds = √(1+z'²)dr。
+ * 封头缠绕基准表面积（回转面）：A = 2π∫[r0,R] r·ds，ds = √(1+z'²)dr。
  * heads = 计入几个封头（默认 2，即整瓶两端）。
  */
 export function headSurfaceArea(p: VolumeParams, heads = 2, samples = 400): number {
-  const a = p.R_in
+  const a = p.R
   const b = a / p.lambda
   const z = (x: number) => b * Math.sqrt(Math.max(0, 1 - (x / a) ** 2))
   let s = 0
@@ -204,9 +203,9 @@ export function headSurfaceArea(p: VolumeParams, heads = 2, samples = 400): numb
   return s * heads
 }
 
-/** 筒身段内表面积 */
+/** 筒身缠绕基准表面积 */
 export function cylinderSurfaceArea(p: VolumeParams): number {
-  return 2 * Math.PI * p.R_in * p.l
+  return 2 * Math.PI * p.R * p.l
 }
 
 // ── 线型缠绕：切点数与转角（郑强 表2-1 / 式2-4）──────────────────────────────
@@ -251,7 +250,7 @@ export function lineTypeTable(maxN = 6, maxM = 6): LineTypeRow[] {
  * h 为封头深度（短半轴 b）。
  */
 export function windingTurns(p: VolumeParams) {
-  const R = p.R_in
+  const R = p.R
   const D = 2 * R
   const h = R / p.lambda
   const sinA = clamp1(p.r0 / R)
@@ -295,13 +294,15 @@ export interface DesignBase {
   r0: number
   /** 阀座容积折减 K_f */
   Kf: number
+  /** 内衬厚度 t (mm)；容积扣壁厚，线型仍使用外表面尺寸 */
+  linerThickness?: number
 }
 
 /** 设计曲线上的一个点：给定 D，容积 V 唯一确定 l，进而唯一确定双程转角 Φ */
 export interface DesignPoint {
-  /** 外径 D = 2·R_in */
+  /** 外径 D = 2·R */
   D: number
-  /** 筒身内半径 R_in */
+  /** 筒身缠绕基准半径 R */
   R: number
   /** 筒身段长度 l（由容积反解） */
   l: number
@@ -311,24 +312,30 @@ export interface DesignPoint {
   ratio: number
 }
 
-/** 由容积与筒身内半径反解筒身段长度：V = πR²[(4/3)K_f·R/λ + l]（朱宁式2.6 反解） */
-export function lengthFromVolume(R_in: number, lambda: number, Kf: number, volumeMm3: number): number {
-  const head = ((4 * Math.PI) / 3) * Kf * R_in * R_in * (R_in / lambda)
-  return (volumeMm3 - head) / (Math.PI * R_in * R_in)
+/** 朱宁式(2.6)反解：a=R−t，b=R/λ−t，l=(V−4πKf·a²b/3)/(πa²)。 */
+export function lengthFromVolume(R: number, lambda: number, Kf: number, volumeMm3: number, t = 0): number {
+  const a = R - t, b = R / lambda - t
+  if (!(a > 0 && b > 0 && t >= 0)) return NaN
+  const head = ((4 * Math.PI) / 3) * Kf * a * a * b
+  return (volumeMm3 - head) / (Math.PI * a * a)
 }
 
-/** 容积被两个封头占满（l = 0）时的内半径上限：V = (4π/3)K_f·R³/λ */
-export function maxInnerRadius(volumeL: number, lambda: number, Kf: number): number {
+/** 容积被两个封头占满（l=0）时的缠绕基准半径上限 */
+export function maxWindingRadius(volumeL: number, lambda: number, Kf: number, t = 0): number {
   const V = volumeL * 1e6
-  return Math.cbrt((3 * V * lambda) / (4 * Math.PI * Kf))
+  const innerLimit = Math.cbrt((3 * V * lambda) / (4 * Math.PI * Kf))
+  if (t === 0) return innerLimit
+  if (!(t > 0 && V > 0 && lambda > 0 && Kf > 0)) return NaN
+  return bisect(R => (4 * Math.PI / 3) * Kf * (R - t) ** 2 * (R / lambda - t) - V,
+    t * Math.max(1, lambda), t * Math.max(1, lambda) + innerLimit) ?? NaN
 }
 
-/** 给定内半径下的双程转角（设计曲线/求根共用；不在可行域返回 NaN） */
+/** 给定缠绕基准半径下的双程转角（设计曲线/求根共用；不在可行域返回 NaN） */
 function thetaAtR(base: DesignBase, volumeMm3: number, R: number): number {
   if (!(R > base.r0)) return NaN
-  const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3)
+  const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3, base.linerThickness)
   if (!(l > 0)) return NaN
-  return windingTurns({ R_in: R, l, lambda: base.lambda, r0: base.r0, Kf: base.Kf }).roundTrip
+  return windingTurns({ R, l, lambda: base.lambda, r0: base.r0, Kf: base.Kf, linerThickness: base.linerThickness }).roundTrip
 }
 
 /**
@@ -342,9 +349,9 @@ export function designCurve(
   opts: { dMin?: number; dMax?: number; samples?: number } = {},
 ): DesignPoint[] {
   const volumeMm3 = volumeL * 1e6
-  const Rmax = maxInnerRadius(volumeL, base.lambda, base.Kf)
+  const Rmax = maxWindingRadius(volumeL, base.lambda, base.Kf, base.linerThickness)
   const dMax = opts.dMax ?? 2 * Rmax * 0.999
-  const dMin = opts.dMin ?? 2 * Math.max(base.r0 * 1.002, Rmax * 0.5)
+  const dMin = opts.dMin ?? 2 * Math.max(base.r0 * 1.002, (base.linerThickness ?? 0) * Math.max(1, base.lambda) + 1e-6, Rmax * 0.5)
   const samples = opts.samples ?? 120
   const out: DesignPoint[] = []
   for (let i = 0; i <= samples; i++) {
@@ -352,7 +359,7 @@ export function designCurve(
     const R = D / 2
     const theta = thetaAtR(base, volumeMm3, R)
     if (!Number.isFinite(theta)) continue
-    const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3)
+    const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3, base.linerThickness)
     out.push({ D, R, l, theta, ratio: l / D })
   }
   return out
@@ -373,8 +380,8 @@ export interface ThetaSolve {
  */
 export function solveForTheta(base: DesignBase, volumeL: number, thetaTarget: number): ThetaSolve {
   const volumeMm3 = volumeL * 1e6
-  const Rmax = maxInnerRadius(volumeL, base.lambda, base.Kf)
-  const lo = base.r0 * 1.002 // 转角最大端（R→r₀，Φ→∞）
+  const Rmax = maxWindingRadius(volumeL, base.lambda, base.Kf, base.linerThickness)
+  const lo = Math.max(base.r0 * 1.002, (base.linerThickness ?? 0) * Math.max(1, base.lambda) + 1e-6)
   const hi = Rmax * 0.999 // 转角最小端（l→0）
   const tLo = thetaAtR(base, volumeMm3, lo)
   const tHi = thetaAtR(base, volumeMm3, hi)
@@ -401,7 +408,7 @@ export function solveForTheta(base: DesignBase, volumeL: number, thetaTarget: nu
     else b = m
   }
   const R = (a + b) / 2
-  const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3)
+  const l = lengthFromVolume(R, base.lambda, base.Kf, volumeMm3, base.linerThickness)
   return { ok: true, D: 2 * R, R, l, theta: thetaAtR(base, volumeMm3, R) }
 }
 
@@ -456,8 +463,8 @@ export function intersectLineTypes(base: DesignBase, volumeL: number, allowed: L
 /** 常用区间提示（只给判据，来源标注见 docs/DESIGN.md） */
 export function geometryChecks(p: VolumeParams): Array<{ level: 'ok' | 'warn'; text: string }> {
   const out: Array<{ level: 'ok' | 'warn'; text: string }> = []
-  const L = p.l + 2 * (p.R_in / p.lambda)
-  const ratio = p.l / (2 * p.R_in)
+  const L = p.l + 2 * (p.R / p.lambda)
+  const ratio = p.l / (2 * p.R)
   out.push({
     level: ratio > 0 && (ratio < 2 || ratio > 5) ? 'warn' : 'ok',
     text: `筒身长径比 l/D = ${ratio.toFixed(2)}，常用 2~5；总长≈${L.toFixed(0)} mm（不含瓶口）`,
@@ -466,7 +473,7 @@ export function geometryChecks(p: VolumeParams): Array<{ level: 'ok' | 'warn'; t
     level: p.lambda > 2.5 ? 'warn' : 'ok',
     text: `封头轴比 λ = ${p.lambda.toFixed(3)}，一般 ≤2.5（标准椭圆为 2，取 √2≈1.414 时赤道环向应力为正）`,
   })
-  const r0d = p.r0 / (2 * p.R_in)
+  const r0d = p.r0 / (2 * p.R)
   out.push({
     level: r0d > 0.2 || r0d < 0.05 ? 'warn' : 'ok',
     text: `极孔比 r_0/D = ${r0d.toFixed(3)}，常用 0.05~0.20`,

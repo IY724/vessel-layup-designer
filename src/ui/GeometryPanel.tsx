@@ -72,14 +72,14 @@ export function GeometryPanel({
   const R = input.geometry.R
   const h = input.geometry.headShortAxis || R
   const lambda = lambdaFromDepth(R, h)
-  const [kf, setKf] = useState(0.8)
+  const kf = input.geometry.headVolumeFactor ?? 0.8
   const [unknown, setUnknown] = useState<UnknownField>('none')
   const [src, setSrc] = useState<{ R?: SrcTag; l?: SrcTag }>({})
   const mark = (patch: { R?: SrcTag; l?: SrcTag }) => setSrc((s) => ({ ...s, ...patch }))
 
   const vp: VolumeParams = useMemo(
-    () => ({ R_in: R, l: input.geometry.cylLength, lambda, r0: result.derived.r0, Kf: kf }),
-    [R, input.geometry.cylLength, lambda, result.derived.r0, kf],
+    () => ({ R, l: input.geometry.cylLength, lambda, r0: result.derived.r0, Kf: kf, linerThickness: input.geometry.linerThickness }),
+    [R, input.geometry.cylLength, lambda, result.derived.r0, kf, input.geometry.linerThickness],
   )
   const targetL = input.geometry.volumeL
   const solved = useMemo(() => solveGeometry(vp, unknown, targetL), [vp, unknown, targetL])
@@ -94,8 +94,8 @@ export function GeometryPanel({
     if (unknown === 'l') {
       onGeometry({ cylLength: Number(shown.l.toFixed(1)) })
       mark({ l: '由容积反算' })
-    } else if (unknown === 'R_in') {
-      onGeometry({ R: Number(shown.R_in.toFixed(2)), headShortAxis: Number((shown.R_in / lambda).toFixed(1)) })
+    } else if (unknown === 'R') {
+      onGeometry({ R: Number(shown.R.toFixed(2)), headShortAxis: Number((shown.R / lambda).toFixed(1)) })
       mark({ R: '由容积反算' })
     } else if (unknown === 'lambda') {
       onGeometry({ headShortAxis: Number((R / shown.lambda).toFixed(1)) })
@@ -112,8 +112,8 @@ export function GeometryPanel({
             <FormulaHelp
               title="容积与尺寸互算 · 公式"
               items={[
-                { frm: 'V=\\dfrac{4\\pi}{3}K_f R^2\\dfrac{R}{\\lambda}+\\pi R^2 l' },
-                { frm: 'b=\\dfrac{R}{\\lambda}', desc: 'R 为筒身段半径，b 为封头深度；K_f 为阀座容积折减' },
+                { frm: 'V=\\dfrac{4\\pi}{3}K_f (R-t)^2(\\dfrac{R}{\\lambda}-t)+\\pi (R-t)^2 l' },
+                { frm: 'h=\\dfrac{R}{\\lambda}', desc: 'R、h 为内衬外表面尺寸；容积径向、轴向半轴分别减去壁厚 t' },
               ]}
             />
           </span>
@@ -125,7 +125,7 @@ export function GeometryPanel({
               <select value={unknown} onChange={(e) => setUnknown(e.target.value as UnknownField)}>
                 <option value="none">按尺寸算容积（正算）</option>
                 <option value="l">已知容积 → 反算筒身长度 l</option>
-                <option value="R_in">已知容积 → 反算筒身段半径 R</option>
+                <option value="R">已知容积 → 反算筒身段半径 R</option>
                 <option value="lambda">已知容积 → 反算封头轴比 λ</option>
               </select>
               <span className="unit" />
@@ -140,11 +140,11 @@ export function GeometryPanel({
               />
             )}
             <N
-              label={sym('筒身段半径 R')}
-              value={unknown === 'R_in' ? Number(shown.R_in.toFixed(2)) : R}
+              label={sym('内衬外半径 R')}
+              value={unknown === 'R' ? Number(shown.R.toFixed(2)) : R}
               unit="mm"
               step={0.5}
-              disabled={unknown === 'R_in'}
+              disabled={unknown === 'R'}
               src={src.R ?? '手填'}
               onChange={(v) => {
                 onGeometry({ R: v })
@@ -164,20 +164,21 @@ export function GeometryPanel({
               }}
             />
             <N
-              label={sym('封头轴比 λ = a/b')}
+              label={sym('外表面轴比 λ = R/h')}
               value={unknown === 'lambda' ? Number(shown.lambda.toFixed(3)) : Number(lambda.toFixed(3))}
               step={0.01}
               disabled={unknown === 'lambda'}
               onChange={(v) => v > 0 && onGeometry({ headShortAxis: Number((R / v).toFixed(1)) })}
             />
             <N
-              label={sym('极孔半径 r_0（阀座通孔）')}
+              label={sym('缠绕极孔半径 r_0')}
               value={vp.r0}
               unit="mm"
               step={0.5}
               onChange={(v) => onGeometry({ poleMode: 'winding', r0Winding: v })}
             />
-            <N label={sym('阀座容积折减 K_f')} value={kf} step={0.05} onChange={setKf} />
+            <N label="内衬厚度 t" value={input.geometry.linerThickness} unit="mm" step={0.5} onChange={v => onGeometry({ linerThickness: v })} />
+            <N label={sym('阀座容积折减 K_f')} value={kf} step={0.05} onChange={v => onGeometry({ headVolumeFactor: v })} />
             {unknown !== 'none' && (
               <div className="field">
                 <span className="lbl">反算结果</span>
@@ -188,6 +189,7 @@ export function GeometryPanel({
               </div>
             )}
             <div className="derived">
+              <div>容积径向半轴 <b>{f(R - input.geometry.linerThickness)}</b> mm　轴向半轴 <b>{f(h - input.geometry.linerThickness)}</b> mm</div>
               <div>
                 容积 V = 封头 <b>{f(vol.headMm3 / 1e6)}</b> + 筒身 <b>{f(vol.cylMm3 / 1e6)}</b> ={' '}
                 <b>{f(computeVolume(solved.params).totalL, 3)} L</b>
@@ -233,7 +235,7 @@ export function GeometryPanel({
           {sym('芯模转角 θ_n')} = <b>{f(turns.roundTrip)}</b>°
         </div>
         <LineTypeDesigner
-          base={{ lambda, r0: result.derived.r0, Kf: kf }}
+          base={{ lambda, r0: result.derived.r0, Kf: kf, linerThickness: input.geometry.linerThickness }}
           volumeL={targetL}
           currentD={2 * R}
           onVolume={(v) => onGeometry({ volumeL: v })}

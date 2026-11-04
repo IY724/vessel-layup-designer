@@ -10,8 +10,9 @@
  */
 import type { DesignInput, MaterialInput, StrengthInput } from './types'
 import { defaultAngles, expansionAngles } from './expansion'
+import { planFromRows } from './layup'
 
-/** 默认工艺参数：T700 级碳纤维 24K，4 束并线 */
+/** 课程基准工艺参数：T700 级碳纤维 24K，4 束并线 */
 export const DEFAULT_MATERIAL: MaterialInput = {
   tex: 1.65,
   fiberDensity: 1.8,
@@ -31,14 +32,21 @@ export const DEFAULT_STRENGTH_B: StrengthInput = {
   sigmaCompositeDirect: 2031,
 }
 
-/** 默认模板强度（"直接给定"）：复材层强度 2080，发挥强度 = 2080 / Vf */
+/** 默认模板：论文复材强度2080，沿Excel工艺链换算发挥强度，不额外叠加论文利用系数。 */
 export const INITIAL_STRENGTH_B: StrengthInput = {
   mode: 'B',
-  sigmaNOL: 2390,
-  kLoss: 0.85,
+  sigmaNOL: 2080,
+  kLoss: 1,
   sigmaSpiralDirect: 2080 / 0.6,
   sigmaHoopDirect: 2080 / 0.6,
   sigmaCompositeDirect: 2080,
+}
+
+/** 单层复材厚0.3 mm；总带宽20 mm由论文两带宽边界反推。
+ * Vf=0.6、纤维密度1.8、4束×5 mm为完成工艺链的假设；tex=0.3×Vf×ρ×b反算。
+ */
+export const INITIAL_MATERIAL: MaterialInput = {
+  tex: 1.62, fiberDensity: 1.8, bandWidth: 5, strandCount: 4, vf: 0.6, resinDensity: 1.2,
 }
 
 /** 常用候选螺旋角（按 140 L 基准案例几何的扩孔步进生成） */
@@ -111,23 +119,24 @@ export function blankInput(): DesignInput {
 export function defaultInput(): DesignInput {
   return {
     geometry: {
-      R: 135,
+      R: 140,
       poleMode: 'winding',
       r0Winding: 36,
-      portInnerRadius: 16,
-      linerAtPole: 20,
-      headShortAxis: 67.5,
+      portInnerRadius: 31,
+      linerAtPole: 5,
+      headShortAxis: 70,
       cylLength: 1282,
       volumeL: 78,
       linerThickness: 5,
     },
-    material: { ...DEFAULT_MATERIAL },
+    material: { ...INITIAL_MATERIAL },
     strength: { ...INITIAL_STRENGTH_B },
     requirement: {
-      pbMode: 'direct',
+      pbMode: 'wp_sf',
       pb: 157.5,
       workingPressure: 70,
       safetyFactor: 2.25,
+      // 沿用原Excel封头应力平衡系数，不按论文结果拟合。
       ks: 0.75,
     },
     constraint: {
@@ -136,20 +145,24 @@ export function defaultInput(): DesignInput {
       candidates: [15, 20, 25, 35, 40],
       angleRule: 'manual',
       candidateSource: 'expansion',
-      expansionGeometry: JSON.stringify([135, 36, 20]),
+      expansionGeometry: JSON.stringify([140, 36, 20]),
       forceEvenSpiral: true,
       alphaRef: 15,
     },
-    plan: {
-      spiral: [
-        { angle: 15, layers: 8 },
-        { angle: 20, layers: 8 },
-        { angle: 25, layers: 4 },
-        { angle: 35, layers: 4 },
-        { angle: 40, layers: 4 },
-      ],
-      hoop: 36,
-    },
+    // 朱宁2023，正文p32 / PDF p47，表3.1的真实缠绕顺序；不是表2.4的按角度汇总顺序。
+    // 环向分组为8/8/4/4/12，不能用自动方案的均分规则替代。
+    plan: planFromRows([
+      { type: 'spiral', angle: 15, layers: 8 },
+      { type: 'hoop', angle: 90, layers: 8 },
+      { type: 'spiral', angle: 20, layers: 8 },
+      { type: 'hoop', angle: 90, layers: 8 },
+      { type: 'spiral', angle: 25, layers: 4 },
+      { type: 'hoop', angle: 90, layers: 4 },
+      { type: 'spiral', angle: 35, layers: 4 },
+      { type: 'hoop', angle: 90, layers: 4 },
+      { type: 'spiral', angle: 40, layers: 4 },
+      { type: 'hoop', angle: 90, layers: 12 },
+    ]),
   }
 }
 
@@ -170,7 +183,7 @@ export interface Preset {
 export const DEFAULT_PRESET: Preset = {
   id: 'default',
   label: '默认',
-  note: '78 L / 70 MPa 级瓶子的常用初值：R=135 mm、24K×4 束、Vf 0.6、爆压 157.5 MPa、平衡系数 0.75',
+  note: '78 L / 70 MPa 初步设计：复材单层厚0.3 mm、螺旋28层/环向36层交替，爆压157.5 MPa',
   make: defaultInput,
 }
 

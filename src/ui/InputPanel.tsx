@@ -39,12 +39,12 @@ export function InputPanel({ store }: { store: DesignStore }) {
             title="几何与极孔公式"
             items={[
               { frm: 'r_0=R\\sin\\alpha', desc: 'α 为极孔处的测地线角' },
-              { frm: 'b=\\dfrac{R}{\\lambda}', desc: 'R 为筒身段半径；λ 为封头轴比（λ=2 为标准椭圆封头）' },
+              { frm: 'h=\\dfrac{R}{\\lambda}', desc: 'R、h 为内衬外表面尺寸；容积扣除内衬壁厚' },
             ]}
           />
         }
       >
-        <Num label={sym('筒身段半径 R')} value={g.R} unit="mm" step={0.5} onChange={(v) => v !== null && setGeometry({ R: v })} />
+        <Num label={sym('内衬外半径 R')} value={g.R} unit="mm" step={0.5} onChange={(v) => v !== null && setGeometry({ R: v })} />
         <Radio
           label="极孔半径取法"
           value={g.poleMode}
@@ -64,12 +64,11 @@ export function InputPanel({ store }: { store: DesignStore }) {
         )}
         {consistency?.level === 'warn' && <div className="hint warn pole-advice" role="status">{consistency.text}</div>}
         <Num
-          label="封头深度 b（半椭球短半轴）"
+          label="封头外表面深度 h"
           value={g.headShortAxis}
           unit="mm"
           step={5}
           onChange={(v) => v !== null && setGeometry({ headShortAxis: v })}
-          hint="只用于画轮廓和估算重量，不影响强度计算"
         />
         <div className="field wide">
           <Num label="筒身段长度" value={g.cylLength} unit="mm" step={10} onChange={(v) => v !== null && setGeometry({ cylLength: v })} />
@@ -81,7 +80,6 @@ export function InputPanel({ store }: { store: DesignStore }) {
           unit="mm"
           step={0.5}
           onChange={(v) => v !== null && setGeometry({ linerThickness: v })}
-          hint="强度按缠绕层等厚计算，内衬只计入重量参考值"
         />
       </Section>
 
@@ -217,7 +215,8 @@ export function InputPanel({ store }: { store: DesignStore }) {
             title="初估角怎么取"
             items={[
               { frm: '\\alpha_0=\\arcsin\\dfrac{r_0}{R}', desc: '极孔反算角' },
-              { note: '经验取法：初估角取 23°，或 极孔缠绕角 + 10°（默认 20° = 10° + 10°）。仅用于初估层数。' },
+              { note: '初算角可采用极孔反算角附近的整度值，或按缠绕经验选定。' },
+              { frm: 'h_{sp}=\\dfrac{Rp_b}{2\\sigma_{sp}\\cos^2\\alpha}', desc: '使用强度参数区的发挥强度' },
             ]}
           />
         }

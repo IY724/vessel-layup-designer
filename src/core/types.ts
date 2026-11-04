@@ -12,7 +12,7 @@ export type PoleInputMode = 'winding' | 'port'
 /** 设计爆压给法：direct = 直接填 pb；wp_sf = 工作压力 × 安全系数换算 */
 export type PbInputMode = 'direct' | 'wp_sf'
 export interface GeometryInput {
-  /** 筒身段中面半径 R（mm）。第一期按 Excel 口径：缠绕层中心面半径 */
+  /** 内衬外半径 / 缠绕基准半径 R（mm）；强度与线型共用 */
   R: number
   poleMode: PoleInputMode
   /** 缠绕极孔半径（mm），poleMode = winding 时生效 */
@@ -21,14 +21,16 @@ export interface GeometryInput {
   portInnerRadius: number
   /** 极孔处内衬厚度（mm），poleMode = port 时生效 */
   linerAtPole: number
-  /** 椭圆封头短半轴 h（mm）— 第一期仅记录，网格理论不依赖 */
+  /** 内衬外表面椭圆封头深度 h（mm），λ=R/h */
   headShortAxis: number
   /** 筒身段长度（mm）— 第一期仅记录与用于重量估算 */
   cylLength: number
   /** 设计容积（L）— 第一期仅记录 */
   volumeL: number
-  /** 内衬厚度（mm）— 仅用于重量估算的参考值，第一期不参与强度 */
+  /** 内衬厚度（mm）；容积用R−t和h−t，强度不计内衬承载 */
   linerThickness: number
+  /** 封头有效容积折减系数；旧方案缺省为0.8。 */
+  headVolumeFactor?: number
 }
 
 export interface MaterialInput {

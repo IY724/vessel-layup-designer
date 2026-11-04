@@ -4,11 +4,12 @@ import type { CheckResult, DesignInput } from '../core/types'
 import { activeGroups, layupGroups } from '../core/layup'
 import { initialDesign } from '../core/initialDesign'
 import { expansionAngles } from '../core/expansion'
-import { allowedLineTypes, intersectLineTypes, lambdaFromDepth, windingTurns, type VolumeParams } from '../core/geometry'
+import { allowedLineTypes, computeVolume, intersectLineTypes, lambdaFromDepth, windingTurns, type VolumeParams } from '../core/geometry'
 import images from './formulaImages.json'
 import linetableRef from '../assets/linetableRef.json'
 import { addNativeCharts, type NativeChart } from './nativeCharts'
 import { domeContourFigure, lineTypeFigure } from './figures'
+import { imprint } from '../core/docStamp'
 
 type Sheet = ExcelJS.Worksheet
 type AddressMap = Record<string,string>
@@ -197,9 +198,9 @@ function summary(ws:Sheet,data:DesignInput,res:CheckResult,maps:Record<string,Ad
   ])
   section(ws,29,'几何与内衬');rows(ws,30,[
     ['项目','数值','单位'],
-    ['筒身段半径 R',data.geometry.R,'mm'],
+    ['内衬外半径 R',data.geometry.R,'mm'],
     ['筒身段长度 l',data.geometry.cylLength,'mm'],
-    ['封头短半轴 b（半椭球）',data.geometry.headShortAxis,'mm'],
+    ['封头外表面深度 h',data.geometry.headShortAxis,'mm'],
     ['极孔半径 r0（缠绕）',res.derived.r0,'mm'],
     ['内衬厚度',data.geometry.linerThickness??3,'mm'],
   ])
@@ -240,20 +241,29 @@ function distribution(ws:Sheet,res:CheckResult,pressure:boolean):NativeChart{
 function lineTypeSheet(ws:Sheet,data:DesignInput,res:CheckResult):number{
   base(ws,[26,20,20,18,16,16,14,16],4);title(ws,'线型切点设计','H')
   const R=data.geometry.R,hAxis=data.geometry.headShortAxis||R
-  const vp:VolumeParams={R_in:R,l:data.geometry.cylLength,lambda:lambdaFromDepth(R,hAxis),r0:res.derived.r0,Kf:0.8}
+  const vp:VolumeParams={R,l:data.geometry.cylLength,lambda:lambdaFromDepth(R,hAxis),r0:res.derived.r0,Kf:data.geometry.headVolumeFactor??0.8,linerThickness:data.geometry.linerThickness}
   const turns=windingTurns(vp)
   // 候选与切线图都按显式目标容积（设计指标）取，与界面 ② 同口径
-  const candidates=intersectLineTypes({lambda:vp.lambda,r0:vp.r0,Kf:vp.Kf},data.geometry.volumeL,allowedLineTypes(450,660,4))
+  const candidates=intersectLineTypes(vp,data.geometry.volumeL,allowedLineTypes(450,660,4))
   const currentD=2*R
   section(ws,4,'设计条件','A','D');rows(ws,5,[
     ['项目','数值','单位'],
     ['目标容积 V',Number(data.geometry.volumeL.toFixed(3)),'L'],
-    ['筒身段半径 R',R,'mm'],
+    ['内衬外半径 R',R,'mm'],
     ['封头轴比 λ',Number(vp.lambda.toFixed(3)),''],
     ['极孔半径 r0',vp.r0,'mm'],
     ['筒身段长度 l',vp.l,'mm'],
     ['阀座容积折减 Kf',vp.Kf,''],
   ])
+  ;['项目','数值','单位'].forEach((value,j)=>{ws.getCell(5,5+j).value=value})
+  table(ws,'E5:G5')
+  const wall=vp.linerThickness??0
+  ;[
+    ['内衬厚度 t',wall,'mm'],
+    ['容积径向半轴 a',live('B7-F6',R-wall),'mm'],
+    ['容积轴向半轴 b',live('B7/B8-F6',hAxis-wall),'mm'],
+    ['几何计算容积',live('(4*PI()/3*B11*F7^2*F8+PI()*F7^2*B10)/1000000',computeVolume(vp).totalL),'L'],
+  ].forEach((values,i)=>{ values.forEach((value,j)=>{ws.getCell(6+i,5+j).value=value as ExcelJS.CellValue});table(ws,`E${6+i}:G${6+i}`,false) })
   section(ws,13,'转角核算','A','D');rows(ws,14,[
     ['项目','符号','数值','单位'],
     ['极孔缠绕角','α₀',live('ASIN(B9/B7)/PI()*180',turns.alpha0Deg),'°'],
@@ -295,19 +305,22 @@ function angleCalcSheet(ws:Sheet,data:DesignInput,res:CheckResult){
     ['单束带宽 b',data.material.bandWidth,'mm'],
     ['总带宽 b_tot',d.bandTotal,'mm'],
   ])
+  ;[['环向发挥强度',d.sigmaHoop]].forEach(([label,value],i)=>{
+    ws.getCell(`E${6+i}`).value=label;ws.getCell(`F${6+i}`).value=value;table(ws,`E${6+i}:F${6+i}`,false)
+  })
   section(ws,15,'筒身单角度初估','A','D');rows(ws,16,[
     ['项目','符号','数值','单位'],
     ['初估角','α',data.constraint.alphaRef,'°'],
-    ['cosα','',live('COS(C17/180*PI())',estimate.cosRef),''],
-    ['tanα','',live('TAN(C17/180*PI())',estimate.tanRef),''],
+    ['cosα','',live('COS(C17/180*3.1415926)',estimate.cosRef),''],
+    ['tanα','',live('TAN(C17/180*3.1415926)',estimate.tanRef),''],
     ['螺旋向纤维厚度','tα',live('B6*B8/(2*B9*C18^2)',estimate.hSpiral),'mm'],
-    ['环向纤维厚度','tθ',live('(2-C19^2)*B6*B8/(2*B9)',estimate.hHoop),'mm'],
+    ['环向纤维厚度','tθ',live('(2-C19^2)*B6*B8/(2*F6)',estimate.hHoop),'mm'],
     ['螺旋向层数','nα',live('C20/B10',estimate.nSpiral),'层'],
     ['环向层数','nθ',live('C21/B10',estimate.nHoop),'层'],
     ['螺旋初估层数（向上取偶）','',live('CEILING(C22,2)',initial.spiral),'层'],
     ['环向初估层数（向上取整）','',live('CEILING(C23,1)',initial.hoop),'层'],
   ])
-  text(ws,'A26:G26','初估角取经验值：23°，或 极孔缠绕角 + 10°（默认 20° = 10° + 10°）；螺旋向上取偶、环向向上取整。',10)
+  text(ws,'A26:G26',`初算角 ${data.constraint.alphaRef}°；螺旋向上取偶、环向向上取整。`,10)
   text(ws,'A27:G27',`初估复核：纵向 ${initial.pa.toFixed(2)} / 环向 ${initial.pth.toFixed(2)} MPa，${initial.pass?'满足':'不满足'}。`,10)
   section(ws,29,'扩孔候选','A','G')
   const picked=new Map(activeGroups(data.plan).filter(g=>g.type==='spiral').map(g=>[Math.round(g.angle),g.layers]))
@@ -315,7 +328,7 @@ function angleCalcSheet(ws:Sheet,data:DesignInput,res:CheckResult){
   const shown=all.slice(0,80)
   const list=shown.map((row,i)=>[
     i+1,
-    live(row.boundary?'2*$B$6':`2*$B$7+${i}*$B$12`,row.diameter),
+    live(row.boundary?'2*$B$6':`2*$B$7+${i}*$B$13`,row.diameter),
     live(`ASIN(B${31+i}/(2*$B$6))/PI()*180`,row.angle),
     live(`ROUND(C${31+i},0)`,Math.round(row.angle)),
     picked.has(Math.round(row.angle))?'是':'—',
@@ -324,7 +337,7 @@ function angleCalcSheet(ws:Sheet,data:DesignInput,res:CheckResult){
   ])
   rows(ws,30,[['序号','扩孔直径 Dᵢ / mm','反算角 αᵢ / °','取整角 / °','采用','分配层数','备注'],...(list.length?list:[['—','—','—','—','—','—','参数不足无法生成候选']])])
   const noteRow=31+Math.max(1,list.length)
-  text(ws,`A${noteRow+1}:G${noteRow+1}`,'Dᵢ = 2r₀ + i·b；角度按整度四舍五入后写入铺层表；“分配层数”为当前铺层表中该角度的层数。',10)
+  text(ws,`A${noteRow+1}:G${noteRow+1}`,'Dᵢ = 2r₀ + i·b_tot；角度按整度四舍五入后写入铺层表；“分配层数”为当前铺层表中该角度的层数。',10)
   if(all.length>80)text(ws,`A${noteRow+2}:G${noteRow+2}`,`候选共 ${all.length} 项，本表列前 80 项。`,10)
   ws.pageSetup.printArea=`A1:H${noteRow+3}`
 }
@@ -338,6 +351,7 @@ function formulas(wb:ExcelJS.Workbook){
 }
 export async function writePresentation(source:WorkBook,data:DesignInput,res:CheckResult):Promise<Uint8Array>{
   const wb=new ExcelJS.Workbook();wb.creator='复合材料气瓶缠绕铺层设计软件';wb.title='气瓶铺层计算书';wb.calcProperties.fullCalcOnLoad=true
+  wb.lastModifiedBy=imprint;wb.company=imprint
   const names=source.SheetNames.filter(n=>n.startsWith('封头-'))
   for(const name of ['工况与气瓶参数','线型切点设计','铺层角度计算','铺层方案','筒身强度设计与计算',...names,'封头总厚度','封头总爆破压强','厚度分布','爆压分布','公式说明'])wb.addWorksheet(name)
   const maps:Record<string,AddressMap>={'筒身强度设计与计算':cylinderMap(res.cylinder.rows.filter(g=>g.type==='spiral').length,Math.max(1,res.cylinder.rows.filter(g=>g.type==='hoop').length))}

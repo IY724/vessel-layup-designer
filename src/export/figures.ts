@@ -2,18 +2,31 @@
  * figures.ts — 计算书插图：把与界面同源的几何/线型图形生成 SVG，再在浏览器/Electron 里栅格化为 PNG。
  *
  * Node（vitest 单测）没有 DOM，调用方 writePresentation 里用 try/catch 跳过；
- * 网页版与桌面版导出时正常嵌入。所有坐标数据都来自 core 的纯函数，与界面同一口径。
+ * 网页版与桌面版导出时正常嵌入。结果图来自 core，理论示意图直接使用用户指定论文的原图。
  */
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { CheckResult, DesignInput } from '../core/types'
-import { DomeContour } from '../ui/DomePanel'
+import { DomeContour, PressureChart, ThicknessChart } from '../ui/DomePanel'
+import type { ReportFigure } from './reportModel'
 import { allowedLineTypes, designCurve, intersectLineTypes, lambdaFromDepth, solveForTheta } from '../core/geometry'
+import paperFigures from '../assets/report-figures/zhuFigures.json'
 
 export interface Figure {
   base64: string
   width: number
   height: number
+}
+
+/** PDF 使用独立计算图，文字、公式和表格由 PDF 排版器单独输出。 */
+export async function reportFigure(kind: ReportFigure, input: DesignInput, result: CheckResult): Promise<Figure> {
+  if (kind === 'line') return lineTypeFigure(input, result, 720, 380)
+  if (kind === 'netting' || kind === 'domeTheory') return paperFigures[kind]
+  const W = 640, H = kind === 'contour' ? 336 : 320
+  const component = kind === 'contour' ? DomeContour : kind === 'pressure' ? PressureChart : ThicknessChart
+  const markup = renderToStaticMarkup(createElement(component, { input, result, W, H }))
+  // 表格/曲线字体明确写进独立 SVG，防止离线导出后 CSS 丢失。
+  return rasterize(standalone(markup, W, H), W, H, 2)
 }
 
 /** 给 React 静态渲染出的 <svg> 根标签补 xmlns/尺寸/字体，独立文件才能被 Image 加载 */
@@ -60,7 +73,7 @@ export async function lineTypeFigure(input: DesignInput, result: CheckResult, W 
   const hAxis = input.geometry.headShortAxis || R
   // 与界面 ② 同口径：候选与曲线都按显式目标容积（设计指标）取
   const targetL = input.geometry.volumeL
-  const base = { lambda: lambdaFromDepth(R, hAxis), r0: result.derived.r0, Kf: 0.8 }
+  const base = { lambda: lambdaFromDepth(R, hAxis), r0: result.derived.r0, Kf: input.geometry.headVolumeFactor ?? 0.8, linerThickness: input.geometry.linerThickness }
   const allowed = allowedLineTypes(450, 660, 4)
   const candidates = intersectLineTypes(base, targetL, allowed)
   const currentD = 2 * R

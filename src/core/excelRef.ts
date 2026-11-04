@@ -22,8 +22,8 @@ export const FORMULAS: FormulaRow[] = [
   { label: '单层纵向爆压贡献', formula: 'p_{\\alpha i}=\\dfrac{2\\,t_f\\,\\sigma_{\\text{螺旋}}\\cos^2\\alpha}{R}', purpose: '一根螺旋纤维层对筒身纵向爆破压强的贡献' },
   { label: '单层环向爆压贡献', formula: 'p_{\\theta i}=\\dfrac{t_f\\,\\sigma_{\\text{螺旋}}\\sin^2\\alpha}{R}', purpose: '一根螺旋纤维层对筒身环向爆破压强的贡献' },
   { label: '环向层单层环向爆压', formula: 'p_{\\theta 90}=\\dfrac{t_f\\,\\sigma_{\\text{环向}}}{R}', purpose: '一根环向（90°）纤维层的环向贡献，纵向为零' },
-  { label: '螺旋向厚度初估', formula: 'h_{\\text{螺}}=\\dfrac{R\\,p_b}{2\\,\\sigma\\cos^2\\alpha_{ref}}', purpose: '按参考角粗估螺旋层所需的总厚度' },
-  { label: '环向厚度初估', formula: 'h_{\\text{环}}=\\dfrac{(2-\\tan^2\\alpha_{ref})\\,R\\,p_b}{2\\,\\sigma}', purpose: '粗估环向层所需的总厚度' },
+  { label: '螺旋向厚度初估', formula: 'h_{\\text{螺}}=\\dfrac{R\\,p_b}{2\\,\\sigma_{sp}\\cos^2\\alpha_{ref}}', purpose: '按参考角和螺旋纤维发挥强度计算所需厚度' },
+  { label: '环向厚度初估', formula: 'h_{\\text{环}}=\\dfrac{(2-\\tan^2\\alpha_{ref})\\,R\\,p_b}{2\\,\\sigma_{hp}}', purpose: '按环向纤维发挥强度计算所需厚度' },
 
   // ── 封头 ──
   { label: '起铺平行圆半径', formula: 'r_{0g}=R\\sin\\alpha_g', purpose: '由缠绕角求该角度组开始铺到的平行圆半径' },

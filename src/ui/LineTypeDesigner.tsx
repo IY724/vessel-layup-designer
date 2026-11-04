@@ -39,7 +39,7 @@ export interface LineTypeDesignerProps {
 }
 
 export function LineTypeDesigner(props: LineTypeDesignerProps) {
-  const { lambda, r0, Kf } = props.base
+  const { lambda, r0, Kf, linerThickness } = props.base
   const { volumeL, currentD, onApply } = props
   const thetaLow = props.thetaLow ?? 450
   const thetaHigh = props.thetaHigh ?? 660
@@ -47,8 +47,8 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
 
   const allowed = useMemo(() => allowedLineTypes(thetaLow, thetaHigh, maxN), [thetaLow, thetaHigh, maxN])
   const candidates = useMemo(
-    () => intersectLineTypes({ lambda, r0, Kf }, volumeL, allowed),
-    [lambda, r0, Kf, volumeL, allowed],
+    () => intersectLineTypes({ lambda, r0, Kf, linerThickness }, volumeL, allowed),
+    [lambda, r0, Kf, linerThickness, volumeL, allowed],
   )
 
   // 视图窗口：纵轴略大于允许转角范围，横轴取两边界转角反解出的 D
@@ -56,23 +56,23 @@ export function LineTypeDesigner(props: LineTypeDesignerProps) {
     const thetas = allowed.map((r) => r.theta)
     const thetaTop = (thetas.length ? Math.max(...thetas) : thetaHigh) * 1.04
     const thetaBot = (thetas.length ? Math.min(...thetas) : thetaLow) * 0.96
-    const hi = solveForTheta({ lambda, r0, Kf }, volumeL, thetaTop)
-    const lo = solveForTheta({ lambda, r0, Kf }, volumeL, thetaBot)
+    const hi = solveForTheta({ lambda, r0, Kf, linerThickness }, volumeL, thetaTop)
+    const lo = solveForTheta({ lambda, r0, Kf, linerThickness }, volumeL, thetaBot)
     let dMin = hi.ok ? hi.D : 0
     let dMax = lo.ok ? lo.D : 0
     if (!(dMax > dMin)) {
-      const c = designCurve({ lambda, r0, Kf }, volumeL, { samples: 10 })
+      const c = designCurve({ lambda, r0, Kf, linerThickness }, volumeL, { samples: 10 })
       if (c.length) {
         dMin = c[c.length - 1].D
         dMax = c[0].D
       }
     }
     return { thetaTop, thetaBot, dMin, dMax }
-  }, [allowed, lambda, r0, Kf, volumeL, thetaLow, thetaHigh])
+  }, [allowed, lambda, r0, Kf, linerThickness, volumeL, thetaLow, thetaHigh])
 
   const curve = useMemo(
-    () => designCurve({ lambda, r0, Kf }, volumeL, { dMin: win.dMin, dMax: win.dMax, samples: 140 }),
-    [lambda, r0, Kf, volumeL, win.dMin, win.dMax],
+    () => designCurve({ lambda, r0, Kf, linerThickness }, volumeL, { dMin: win.dMin, dMax: win.dMax, samples: 140 }),
+    [lambda, r0, Kf, linerThickness, volumeL, win.dMin, win.dMax],
   )
 
   const W = 560

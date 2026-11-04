@@ -29,14 +29,15 @@ import {
   intersectLineTypes,
   allowedLineTypes,
   lengthFromVolume,
-  maxInnerRadius,
+  maxWindingRadius,
   type VolumeParams,
   type DesignBase,
 } from '../src/core/geometry'
 
 /** 朱宁 2023 式(2.6) 的算例 */
 const ZHU: VolumeParams = {
-  R_in: 140 - 5,
+  R: 140,
+  linerThickness: 5,
   l: 1282,
   lambda: 2,
   r0: 36,
@@ -44,7 +45,7 @@ const ZHU: VolumeParams = {
 }
 /** 课程案例（封头表 C14 短半轴 100、R 173.5）折算成内表面参数 */
 const COURSE: VolumeParams = {
-  R_in: 173.5,
+  R: 173.5,
   l: 800,
   lambda: 173.5 / 100,
   r0: 30.13,
@@ -57,11 +58,14 @@ describe('容积正算（朱宁式2.6）', () => {
     expect(v.totalL).toBeCloseTo(77.37, 1)
     expect(v.b).toBeCloseTo(65, 6)
   })
-  it('按轴比一致性 b = R_in/λ → 与原文写法差 <0.2 L', () => {
+  it('主入口扣除壁厚，与论文式(2.6)逐项代入一致；轴比定义在外表面', () => {
     const lit = computeVolumeZhuLiteral(ZHU, 5).totalL
     const std = computeVolume(ZHU).totalL
-    expect(std).toBeGreaterThan(lit)
-    expect(std - lit).toBeLessThan(0.2)
+    const expected=(4*Math.PI/3*0.8*135**2*65+Math.PI*135**2*1282)/1e6
+    expect(std).toBeCloseTo(expected,12)
+    expect(std).toBe(lit)
+    expect(headMinorAxis(ZHU)).toBe(70)
+    expect(windingTurns(ZHU)).toEqual(windingTurns({...ZHU,linerThickness:0}))
   })
   it('封头/筒身分解：筒身占绝大部分，封头含 Kf 折减', () => {
     const v = computeVolume(ZHU)
@@ -77,6 +81,20 @@ describe('容积正算（朱宁式2.6）', () => {
 })
 
 describe('容积↔尺寸互算', () => {
+  it('有壁厚的线型曲线与各候选始终满足同一容积式，壁厚不改变既定外尺寸转角', () => {
+    const base={lambda:2,r0:36,Kf:.8,linerThickness:5}
+    const points=[...designCurve(base,78,{dMin:260,dMax:330,samples:12}),
+      ...intersectLineTypes(base,78,allowedLineTypes())]
+    expect(points.length).toBeGreaterThan(12)
+    for(const point of points){
+      const a=point.R-5,b=point.R/2-5
+      const volume=(Math.PI*a*a*point.l+4*Math.PI/3*.8*a*a*b)/1e6
+      expect(volume).toBeCloseTo(78,8)
+    }
+    const Rmax=maxWindingRadius(78,2,.8,5)
+    expect((4*Math.PI/3*.8*(Rmax-5)**2*(Rmax/2-5))/1e6).toBeCloseTo(78,8)
+    expect(solveGeometry({...ZHU,linerThickness:70},'none',78).ok).toBe(false)
+  })
   it('反算筒身长度 l 后再正算，回到目标容积', () => {
     const out = solveGeometry(ZHU, 'l', 78)
     expect(out.ok).toBe(true)
@@ -84,9 +102,9 @@ describe('容积↔尺寸互算', () => {
     expect(computeVolume(out.params).totalL).toBeCloseTo(78, 6)
   })
   it('反算筒身段半径 R 后再正算，回到目标容积', () => {
-    const out = solveGeometry({ ...ZHU, l: 1282 }, 'R_in', 80)
+    const out = solveGeometry({ ...ZHU, l: 1282 }, 'R', 80)
     expect(out.ok).toBe(true)
-    expect(out.params.R_in).toBeGreaterThan(ZHU.R_in)
+    expect(out.params.R).toBeGreaterThan(ZHU.R)
     expect(computeVolume(out.params).totalL).toBeCloseTo(80, 4)
   })
   it('反算封头轴比 λ（λ↑ 封头变浅 → 容积单调减）', () => {
@@ -124,14 +142,14 @@ describe('外形轮廓（半椭球）', () => {
     const inner = prof.slice(0, prof.length - 1)
     expect(inner.every((p) => p.Rphi > 0 && Number.isFinite(p.Rphi))).toBe(true)
     expect(inner.every((p) => p.Rtheta > 0 && Number.isFinite(p.Rtheta))).toBe(true)
-    // 赤道上 R_θ → R_in（圆柱极限），R_φ 在椭球赤道取最小
+    // 赤道上 R_θ → R（圆柱极限），R_φ 在椭球赤道取最小
     const eq = prof[prof.length - 2]
     expect(eq.Rtheta).toBeGreaterThan(eq.Rphi)
   })
   it('单个封头面积介于同半径圆盘与半球之间（扁椭球必小于半球）', () => {
     const one = headSurfaceArea(COURSE, 1)
-    const disk = Math.PI * COURSE.R_in ** 2
-    const hemisphere = 2 * Math.PI * COURSE.R_in ** 2
+    const disk = Math.PI * COURSE.R ** 2
+    const hemisphere = 2 * Math.PI * COURSE.R ** 2
     expect(one).toBeGreaterThan(disk)
     expect(one).toBeLessThan(hemisphere)
     expect(headSurfaceArea(COURSE, 2)).toBeCloseTo(2 * one, 6)
@@ -246,17 +264,17 @@ describe('Ⅳ型瓶接头尺寸设计（对齐 type4_builder_kernel.py 默认参
   })
 })
 
-describe('容积驱动的线型切点设计（V → Φ=f(D) → 与线型表求交）', () => {
-  // 论文算例口径：V≈77.4 L（=78 L 量级）、λ=2、r₀=36、K_f=0.8
+describe('无壁厚兼容基准：容积驱动的线型切点设计', () => {
+  // 原无壁厚几何基准；朱宁有壁厚算例另测，不能把此R=135用于论文缠绕半径。
   const base: DesignBase = { lambda: 2, r0: 36, Kf: 0.8 }
   const V = 77.4
 
-  it('长度反解 lengthFromVolume：R_in=135 时 l≈1280 mm', () => {
+  it('长度反解 lengthFromVolume：R=135 时 l≈1280 mm', () => {
     expect(lengthFromVolume(135, 2, 0.8, V * 1e6)).toBeCloseTo(1280, 0)
   })
 
-  it('maxInnerRadius：封头填满容积的半径上限 ≈ 358.8 mm', () => {
-    expect(maxInnerRadius(V, 2, 0.8)).toBeCloseTo(358.8, 0)
+  it('maxWindingRadius：封头填满容积的半径上限 ≈ 358.8 mm', () => {
+    expect(maxWindingRadius(V, 2, 0.8)).toBeCloseTo(358.8, 0)
   })
 
   it('designCurve：在可行域内 Φ 随 D 单调减，且覆盖 632°', () => {
@@ -268,7 +286,7 @@ describe('容积驱动的线型切点设计（V → Φ=f(D) → 与线型表求�
     expect(Math.min(...thetas)).toBeLessThan(560)
   })
 
-  it('solveForTheta(632°) → R_in≈135、D≈270（论文 630°/4切点）', () => {
+  it('solveForTheta(632°) → 无壁厚基准R≈135、D≈270', () => {
     const s = solveForTheta(base, V, 632)
     expect(s.ok).toBe(true)
     expect(s.R).toBeCloseTo(134.9, 0)
