@@ -10,7 +10,10 @@ import { GeometryPanel } from './ui/GeometryPanel'
 import { AutoDesignModal } from './ui/AutoDesignModal'
 import { Modal } from './ui/Modal'
 import { exportWorkbook } from './export/excel'
+import { createPdfReport, type PdfReport } from './export/pdf'
+import { PdfPreview } from './ui/PdfPreview'
 import { DEFAULT_PRESET } from './core/presets'
+
 import { version as packageVersion } from '../package.json'
 
 /** 对外版本标识：package.json 存 semver（1.0.0），界面与文档一律只显示主.次 → V1.0 */
@@ -23,6 +26,29 @@ export default function App() {
   const [auto, setAuto] = useState(false)
   const [msg, setMsg] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [pdfOpen, setPdfOpen] = useState(false)
+  const [pdfReport, setPdfReport] = useState<PdfReport | null>(null)
+  const [pdfError, setPdfError] = useState('')
+  const [pdfBusy, setPdfBusy] = useState(false)
+
+  const previewPdf = async () => {
+    if (pdfBusy) return
+    setPdfOpen(true); setPdfBusy(true); setPdfReport(null); setPdfError('')
+    // 先显示预览窗口，再生成当前输入的完整快照。
+    const snapshot = structuredClone(input)
+    await new Promise<void>(resolve => setTimeout(resolve, 30))
+    try { setPdfReport(await createPdfReport(snapshot, result)) }
+    catch (e) { setPdfError(`PDF 生成失败：${(e as Error).message}`) }
+    finally { setPdfBusy(false) }
+  }
+
+  useEffect(() => {
+    const print = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); void previewPdf() }
+    }
+    window.addEventListener('keydown', print)
+    return () => window.removeEventListener('keydown', print)
+  })
 
   useEffect(() => {
     if (!msg) return
@@ -48,7 +74,7 @@ export default function App() {
         <div className="brand">
           <span className="mark">铺</span>
           <span className="bt">
-            <b>复合材料气瓶缠绕铺层设计</b>
+            <b>复合材料气瓶缠绕铺层设计软件</b>
             <span>筒身网格理论 · 封头缠绕规律校核 · {releaseLabel}</span>
           </span>
         </div>
@@ -66,8 +92,8 @@ export default function App() {
           <button className="btn" onClick={exportExcel} disabled={exporting} title="导出计算书">
             {exporting ? '正在生成计算书…' : '导出 Excel 计算书'}
           </button>
-          <button className="btn" onClick={() => window.print()} title="打印或另存为 PDF">
-            打印 / PDF
+          <button className="btn" onClick={previewPdf} disabled={pdfBusy} title="预览并保存含正文、公式和表格的 PDF 计算书">
+            {pdfBusy ? '正在生成 PDF…' : '导出 PDF 计算书'}
           </button>
         </div>
 
@@ -96,6 +122,7 @@ export default function App() {
       </div>
 
       {auto && <AutoDesignModal input={input} onApply={(next) => setInput(next)} onClose={() => setAuto(false)} />}
+      {pdfOpen && <PdfPreview report={pdfReport} error={pdfError} onClose={() => setPdfOpen(false)} />}
       {expand === 'contour' && (
         <Modal title="封头厚度几何轮廓" onClose={() => setExpand(null)} wide>
           <div style={{ maxWidth: 1150 }}>

@@ -291,7 +291,21 @@ svg.viz { width: 100%; height: auto; display: block; background: #fff; border: 1
 .statusbar span:first-child { border-left: 0; padding-left: 0; }
 .statusbar span.msg { color: var(--head); }
 
+/* 归属标记：顶栏行与状态栏右下角各一份，窄位置用短写法 */
+.brand .bt .sig { font-size: 9px; color: #93a2b3; letter-spacing: 0.1px; margin-top: 1px; }
+.statusbar span.stamp { margin-left: auto; border-left: 0; color: #a3b1bf; font-size: 10px; cursor: default; }
+
 /* ── 打印 ───────────────────────────────────────────────── */
+.modal .box.pdf-preview { height: 94vh; max-height: 94vh; }
+.modal .box.pdf-preview > .pdf-toolbar { flex: 0 0 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: #f5f7fa; }
+.pdf-toolbar label { display: flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; }
+.pdf-toolbar input { width: 56px; padding: 4px; }
+.pdf-toolbar select { padding: 4px; }
+.pdf-file { color: var(--muted); font-size: 12px; margin-left: auto; }
+.modal .box.pdf-preview > .pdf-view { flex: 1; min-height: 0; overflow: auto; padding: 22px; background: #dce1e8; text-align: center; }
+.pdf-view canvas { display: block; margin: 0 auto; background: white; box-shadow: 0 3px 16px #23364c33; }
+.pdf-error { padding: 15px; background: white; color: #9b2323; }
+
 @media print {
   .topbar, .statusbar, .modal, .stepper button, .btn, .chips button, .pane-actions button { display: none !important; }
   .layout { grid-template-columns: 1fr; padding: 0; gap: 6px; }

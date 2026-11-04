@@ -14,7 +14,7 @@ const GREEK: Record<string, string> = {
 }
 const OPS: Record<string, string> = {
   cdot: '⋅', times: '×', ge: '≥', le: '≤', approx: '≈', pm: '±', to: '→',
-  circ: '∘', sum: '∑', in: '∈', neq: '≠', ldots: '…', dots: '…',
+  circ: '∘', sum: '∑', int: '∫', in: '∈', neq: '≠', ldots: '…', dots: '…',
 }
 const FN = new Set(['cos', 'sin', 'tan', 'cot', 'sec', 'csc', 'arcsin', 'arccos', 'arctan', 'exp', 'ln', 'log', 'min', 'max'])
 const DELIM: Record<string, string> = { '{': '{', '}': '}', '|': '|', '.': '' }

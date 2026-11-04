@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import ExcelJS from 'exceljs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const out = path.resolve(root, '../_work/desktop_qa')
+const out = path.resolve(root, process.env.DESKTOP_QA_OUT || '../_work/desktop_qa')
 await mkdir(out, { recursive: true })
 const executablePath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'release/win-unpacked/VesselLayupDesigner.exe')
 const env = { ...process.env }
@@ -42,7 +42,19 @@ try {
   assert.equal(workbook.getWorksheet('公式说明').getImages().length, 17)
   assert.equal(workbook.getWorksheet('线型切点设计').getImages().length, 2, '切线图或表2-1原表插图未嵌入')
   assert.ok(workbook.getWorksheet('封头总厚度').getImages().length >= 1, '封头厚度轮廓图未嵌入')
-  assert.ok(Math.abs(workbook.getWorksheet('筒身强度设计与计算').getCell('H28').result - 215.1020491263652) < 1e-8)
+  const cellNumber = cell => Number(cell.result ?? cell.value)
+  assert.ok(Math.abs(cellNumber(workbook.getWorksheet('工况与气瓶参数').getCell('B8')) - 203.64856339366267) < 1e-8)
+  const geometry=workbook.getWorksheet('线型切点设计')
+  assert.equal(cellNumber(geometry.getCell('B7')),140)
+  assert.equal(cellNumber(geometry.getCell('F7')),135)
+  assert.equal(cellNumber(geometry.getCell('F8')),65)
+  assert.ok(Math.abs(cellNumber(geometry.getCell('F9'))-77.37130095203019)<1e-8)
+  const expected = [[15,8],[90,8],[20,8],[90,8],[25,4],[90,4],[35,4],[90,4],[40,4],[90,12]]
+  const layup = workbook.getWorksheet('铺层方案')
+  assert.deepEqual(expected.map((_,i) => [cellNumber(layup.getCell(`C${i+5}`)),cellNumber(layup.getCell(`D${i+5}`))]), expected)
+  const initialSheet = workbook.getWorksheet('铺层角度计算')
+  assert.equal(cellNumber(initialSheet.getCell('C24')),20)
+  assert.equal(cellNumber(initialSheet.getCell('C25')),35)
   await page.screenshot({ path: path.join(out, 'desktop.png') })
   await page.getByRole('button', { name: '校核明细', exact: true }).click()
   await page.locator('.modal').waitFor()

@@ -1,6 +1,6 @@
 {
   "appId": "cn.vessel.layup.designer",
-  "productName": "气瓶铺层设计",
+  "productName": "复合材料气瓶缠绕铺层设计软件",
   "directories": { "output": "release", "buildResources": "desktop" },
   "files": ["dist/**/*", "desktop/main.cjs", "desktop/icon.png", "package.json", "!node_modules/**/*"],
   "asar": true,
@@ -13,20 +13,20 @@
     "target": ["nsis", "portable"]
   },
   "nsis": {
-    "artifactName": "气瓶铺层设计-1.0-Windows-x64-安装包.${ext}",
+    "artifactName": "复合材料气瓶缠绕铺层设计软件-1.0-Windows-x64-安装包.${ext}",
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "气瓶铺层设计",
+    "shortcutName": "复合材料气瓶缠绕铺层设计软件",
     "runAfterFinish": false,
     "deleteAppDataOnUninstall": false,
     "installerLanguages": ["zh_CN", "en_US"],
     "language": "2052"
   },
   "portable": {
-    "artifactName": "气瓶铺层设计-1.0-Windows-x64-免安装.${ext}",
+    "artifactName": "复合材料气瓶缠绕铺层设计软件-1.0-Windows-x64-免安装.${ext}",
     "requestExecutionLevel": "user"
   }
 }

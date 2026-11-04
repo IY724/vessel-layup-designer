@@ -7,6 +7,7 @@ import type { DesignInput, GeometryInput, LayupPlan } from '../core/types'
 import { runCheck } from '../core/checker'
 import { defaultInput } from '../core/presets'
 import { layupGroups, planFromRows } from '../core/layup'
+import { migrateDefaultLayup } from './migrations'
 
 const KEY = 'vessel-layup-designer.input.v1'
 
@@ -20,8 +21,8 @@ function load(): DesignInput {
         if(originalPlan && parsed.geometry.R===173.5 && parsed.material.bandWidth*parsed.material.strandCount===20){
           parsed.plan.spiral=parsed.plan.spiral.map(g=>g.angle===45&&g.splineEndRadius===undefined?{...g,splineEndRadius:163}:g)
         }
-        return { ...parsed, constraint: { ...parsed.constraint, alphaRef: parsed.constraint.alphaRef ?? 20,
-          manualSpiralEstimate: null, manualHoopEstimate: null, preserveCourseSelections: false }, plan: planFromRows(layupGroups(parsed.plan)) }
+        return migrateDefaultLayup({ ...parsed, constraint: { ...parsed.constraint, alphaRef: parsed.constraint.alphaRef ?? 20,
+          manualSpiralEstimate: null, manualHoopEstimate: null, preserveCourseSelections: false }, plan: planFromRows(layupGroups(parsed.plan)) })
       }
     }
   } catch {

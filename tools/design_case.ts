@@ -31,7 +31,7 @@ mkdirSync(OUT, { recursive: true })
 // ── ① 容积与尺寸互算 ──────────────────────────────────────────────────────────
 const base = defaultInput()
 const R = base.geometry.R // 173.5
-const vp0: VolumeParams = { R_in: R, l: 800, lambda: R / base.geometry.headShortAxis, r0: base.geometry.r0Winding, Kf: 0.8 }
+const vp0: VolumeParams = { R: R, l: 800, lambda: R / base.geometry.headShortAxis, r0: base.geometry.r0Winding, Kf: 0.8, linerThickness: base.geometry.linerThickness }
 const geo = solveGeometry(vp0, 'l', 140)
 const vp = geo.params
 const vol = computeVolume(vp)
