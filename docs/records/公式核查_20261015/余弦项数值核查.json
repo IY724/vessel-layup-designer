@@ -1,0 +1,263 @@
+{
+  "sha256": "196a4c488dbb7992469c9179922e64e45e33002b029e9012b490524a80414218",
+  "originalFormula": "2*J23*$C$15/$C$3*COS(K23/180*PI()*COS(K23/180*PI()))",
+  "probeAngles": [
+    {
+      "deg": 0,
+      "originalFactor": 1,
+      "squaredFactor": 1
+    },
+    {
+      "deg": 10,
+      "originalFactor": 0.985264726887114,
+      "squaredFactor": 0.9698463103929541
+    },
+    {
+      "deg": 45,
+      "originalFactor": 0.8497104919695335,
+      "squaredFactor": 0.5000000000000001
+    },
+    {
+      "deg": 60,
+      "originalFactor": 0.8660254037844386,
+      "squaredFactor": 0.2500000000000001
+    },
+    {
+      "deg": 90,
+      "originalFactor": 1,
+      "squaredFactor": 3.749399456654644e-33
+    }
+  ],
+  "points": [
+    {
+      "r": 30.2,
+      "original": 11.670751017259661,
+      "squaredLocal": 0.055914150152195294,
+      "squaredCylinderSubstitution": 11.379925950378734,
+      "groups": [
+        {
+          "angle": 10,
+          "original": 15.561001356346214,
+          "squaredLocal": 0.07455220020292706,
+          "squaredCylinder": 15.173234600504978,
+          "thickness": 0.6682436104070568,
+          "localAngle": 86.04168126692069
+        },
+        {
+          "angle": 17,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        },
+        {
+          "angle": 25,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        },
+        {
+          "angle": 37,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        },
+        {
+          "angle": 40,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        },
+        {
+          "angle": 45,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        }
+      ]
+    },
+    {
+      "r": 81,
+      "original": 164.88597568442074,
+      "squaredLocal": 100.36824881223308,
+      "squaredCylinderSubstitution": 166.39470264175787,
+      "groups": [
+        {
+          "angle": 10,
+          "original": 65.62931829358487,
+          "squaredLocal": 60.282720332237425,
+          "squaredCylinder": 67.85210090130576,
+          "thickness": 2.988270732891948,
+          "localAngle": 21.83593629618545
+        },
+        {
+          "angle": 17,
+          "original": 84.30129626334572,
+          "squaredLocal": 59.303033239400065,
+          "squaredCylinder": 89.22852130445021,
+          "thickness": 4.167452175434136,
+          "localAngle": 38.77421216729901
+        },
+        {
+          "angle": 25,
+          "original": 69.91735302229705,
+          "squaredLocal": 14.238578178006597,
+          "squaredCylinder": 64.77898131658789,
+          "thickness": 3.368544207983632,
+          "localAngle": 64.85534189895301
+        },
+        {
+          "angle": 37,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        },
+        {
+          "angle": 40,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        },
+        {
+          "angle": 45,
+          "original": 0,
+          "squaredLocal": 0,
+          "squaredCylinder": 0,
+          "thickness": 0,
+          "localAngle": null
+        }
+      ]
+    },
+    {
+      "r": 163,
+      "original": 101.70229078276472,
+      "squaredLocal": 83.69683882583904,
+      "squaredCylinderSubstitution": 86.91438803682871,
+      "groups": [
+        {
+          "angle": 10,
+          "original": 30.457072424197374,
+          "squaredLocal": 29.91442107042145,
+          "squaredCylinder": 30.038619698408613,
+          "thickness": 1.322929237398139,
+          "localAngle": 10.651460592366801
+        },
+        {
+          "angle": 17,
+          "original": 30.010478198677365,
+          "squaredLocal": 28.377715152618478,
+          "squaredCylinder": 28.734894997191926,
+          "thickness": 1.342074248415752,
+          "localAngle": 18.131892726248743
+        },
+        {
+          "angle": 25,
+          "original": 29.421269230973508,
+          "squaredLocal": 25.66385401105448,
+          "squaredCylinder": 26.428058584539105,
+          "thickness": 1.3742742146271603,
+          "localAngle": 26.73355656409014
+        },
+        {
+          "angle": 37,
+          "original": 14.772390279672239,
+          "squaredLocal": 10.118737153501694,
+          "squaredCylinder": 10.94525856014056,
+          "thickness": 0.732973633408131,
+          "localAngle": 39.83525070119197
+        },
+        {
+          "angle": 40,
+          "original": 15.030395006668233,
+          "squaredLocal": 9.374534242183808,
+          "squaredCylinder": 10.342971891880866,
+          "thickness": 0.7528300938758595,
+          "localAngle": 43.17226710863605
+        },
+        {
+          "angle": 45,
+          "original": 15.911449236830908,
+          "squaredLocal": 8.1465234713388,
+          "squaredCylinder": 9.396046983610562,
+          "thickness": 0.8026657566009021,
+          "localAngle": 48.82102901594303
+        }
+      ]
+    },
+    {
+      "r": 173.5,
+      "original": 92.94138035490438,
+      "squaredLocal": 79.38986572678792,
+      "squaredCylinderSubstitution": 79.38986635325438,
+      "groups": [
+        {
+          "angle": 10,
+          "original": 28.55819170763516,
+          "squaredLocal": 28.11128429537438,
+          "squaredCylinder": 28.111284324889123,
+          "thickness": 1.2380475636894208,
+          "localAngle": 10.000000170581613
+        },
+        {
+          "angle": 17,
+          "original": 28.069367281494177,
+          "squaredLocal": 26.739133909883478,
+          "squaredCylinder": 26.739133992634784,
+          "thickness": 1.2488614682587256,
+          "localAngle": 17.00000028998874
+        },
+        {
+          "angle": 25,
+          "original": 27.322318712409608,
+          "squaredLocal": 24.31927748884646,
+          "squaredCylinder": 24.319277657658265,
+          "thickness": 1.2646163961067598,
+          "localAngle": 25.000000426454033
+        },
+        {
+          "angle": 37,
+          "original": 13.266159088840658,
+          "squaredLocal": 9.726536159903679,
+          "squaredCylinder": 9.72653632138189,
+          "thickness": 0.6513591824977302,
+          "localAngle": 37.00000063115196
+        },
+        {
+          "angle": 40,
+          "original": 13.26876647122032,
+          "squaredLocal": 9.050090065167883,
+          "squaredCylinder": 9.05009024603766,
+          "thickness": 0.658725592675913,
+          "localAngle": 40.000000682326444
+        },
+        {
+          "angle": 45,
+          "original": 13.437037211605931,
+          "squaredLocal": 7.90683238320803,
+          "squaredCylinder": 7.906832595070795,
+          "thickness": 0.6754482792933445,
+          "localAngle": 45.00000076761725
+        }
+      ]
+    }
+  ],
+  "maximumDifference": {
+    "r": 81,
+    "original": 164.88597568442074,
+    "squaredLocal": 100.36824881223308,
+    "difference": 64.51772687218767
+  }
+}

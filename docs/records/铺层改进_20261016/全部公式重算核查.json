@@ -1,0 +1,12 @@
+[
+  {
+    "name": "界面实际导出.xlsx",
+    "formulasCompared": 6143,
+    "failures": []
+  },
+  {
+    "name": "案例-A自动生成.xlsx",
+    "formulasCompared": 11491,
+    "failures": []
+  }
+]

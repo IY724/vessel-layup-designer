@@ -1,0 +1,209 @@
+{
+  "input": {
+    "geometry": {
+      "R": 140,
+      "poleMode": "winding",
+      "r0Winding": 36,
+      "portInnerRadius": 31,
+      "linerAtPole": 5,
+      "headShortAxis": 70,
+      "cylLength": 1282,
+      "volumeL": 78,
+      "linerThickness": 5
+    },
+    "material": {
+      "tex": 1.62,
+      "fiberDensity": 1.8,
+      "bandWidth": 5,
+      "strandCount": 4,
+      "vf": 0.6,
+      "resinDensity": 1.2
+    },
+    "strength": {
+      "mode": "B",
+      "sigmaNOL": 2080,
+      "kLoss": 1,
+      "sigmaSpiralDirect": 3466.666666666667,
+      "sigmaHoopDirect": 3466.666666666667,
+      "sigmaCompositeDirect": 2080
+    },
+    "requirement": {
+      "pbMode": "wp_sf",
+      "pb": 157.5,
+      "workingPressure": 70,
+      "safetyFactor": 2.25,
+      "ks": 0.75
+    },
+    "constraint": {
+      "manualSpiralEstimate": null,
+      "manualHoopEstimate": null,
+      "candidates": [
+        15,
+        20,
+        25,
+        35,
+        40
+      ],
+      "angleRule": "manual",
+      "candidateSource": "expansion",
+      "expansionGeometry": "[140,36,20]",
+      "forceEvenSpiral": true,
+      "alphaRef": 15
+    },
+    "plan": {
+      "groups": [
+        {
+          "type": "spiral",
+          "angle": 15,
+          "layers": 8
+        },
+        {
+          "type": "hoop",
+          "angle": 90,
+          "layers": 8
+        },
+        {
+          "type": "spiral",
+          "angle": 20,
+          "layers": 8
+        },
+        {
+          "type": "hoop",
+          "angle": 90,
+          "layers": 8
+        },
+        {
+          "type": "spiral",
+          "angle": 25,
+          "layers": 4
+        },
+        {
+          "type": "hoop",
+          "angle": 90,
+          "layers": 4
+        },
+        {
+          "type": "spiral",
+          "angle": 35,
+          "layers": 4
+        },
+        {
+          "type": "hoop",
+          "angle": 90,
+          "layers": 4
+        },
+        {
+          "type": "spiral",
+          "angle": 40,
+          "layers": 4
+        },
+        {
+          "type": "hoop",
+          "angle": 90,
+          "layers": 12
+        }
+      ],
+      "spiral": [
+        {
+          "angle": 15,
+          "layers": 8
+        },
+        {
+          "angle": 20,
+          "layers": 8
+        },
+        {
+          "angle": 25,
+          "layers": 4
+        },
+        {
+          "angle": 35,
+          "layers": 4
+        },
+        {
+          "angle": 40,
+          "layers": 4
+        }
+      ],
+      "hoop": 36
+    }
+  },
+  "derived": {
+    "tf": 0.18000000000000002,
+    "tc": 0.30000000000000004,
+    "bandTotal": 20,
+    "r0": 36,
+    "sigmaSpiral": 3466.666666666667,
+    "sigmaHoop": 3466.666666666667,
+    "sigmaComposite": 2080,
+    "sigmaNOLAdjusted": 3466.666666666667,
+    "pb": 157.5
+  },
+  "initial": {
+    "spiral": 20,
+    "hoop": 35
+  },
+  "sourceComparison": [
+    {
+      "angle": 15,
+      "layers": 8,
+      "paPaper": 69,
+      "paActual": 66.53713455703767,
+      "pthPaper": 2.48,
+      "pthActual": 2.3885755786240304
+    },
+    {
+      "angle": 20,
+      "layers": 8,
+      "paPaper": 65.3,
+      "paActual": 62.97209927330704,
+      "pthPaper": 4.33,
+      "pthActual": 4.1710932204893485
+    },
+    {
+      "angle": 25,
+      "layers": 4,
+      "paPaper": 30.37,
+      "paActual": 29.28855644457454,
+      "pthPaper": 3.3,
+      "pthActual": 3.184293206284161
+    },
+    {
+      "angle": 35,
+      "layers": 4,
+      "paPaper": 24.81,
+      "paActual": 23.926302333011694,
+      "pthPaper": 6.08,
+      "pthActual": 5.865420262065584
+    },
+    {
+      "angle": 40,
+      "layers": 4,
+      "paPaper": 21.7,
+      "paActual": 20.92447078573171,
+      "pthPaper": 7.64,
+      "pthActual": 7.366336035705576
+    }
+  ],
+  "pa": 203.64856339366267,
+  "pth": 183.4328611603116,
+  "hoopContribution": 160.4571428571429,
+  "headEstimate": 152.736422545247,
+  "equatorLocalPressure": 159.53439040096592,
+  "maxThickness": 18.8395151285511,
+  "maxThicknessRadius": 65,
+  "comparison": {
+    "initialPaper": [
+      28,
+      36
+    ],
+    "hoopPaper": 160.45,
+    "hoopDifference": 0.007142857142923731,
+    "pthPaper": 183.43,
+    "pthDifference": 0.0028611603115962225,
+    "equatorPaper": 168.47,
+    "equatorDifference": -8.93560959903408,
+    "maximumThicknessPaper": 19.1,
+    "maximumThicknessDifference": -0.2604848714489023
+  }
+}

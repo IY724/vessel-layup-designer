@@ -1,0 +1,63 @@
+{
+  "mode": "desktop",
+  "executablePath": "release_zhu_radius_20261017/win-unpacked/VesselLayupDesigner.exe",
+  "defaultLayupOrder": [
+    [
+      15,
+      8
+    ],
+    [
+      90,
+      8
+    ],
+    [
+      20,
+      8
+    ],
+    [
+      90,
+      8
+    ],
+    [
+      25,
+      4
+    ],
+    [
+      90,
+      4
+    ],
+    [
+      35,
+      4
+    ],
+    [
+      90,
+      4
+    ],
+    [
+      40,
+      4
+    ],
+    [
+      90,
+      12
+    ]
+  ],
+  "legacyDefaultMigrated": true,
+  "pageCount": 17,
+  "default": {
+    "file": "F:\\abaqus_temp\\qingping\\_work\\zhu_radius_20261017\\qa\\desktop-default.pdf",
+    "size": 509141
+  },
+  "customKf": {
+    "file": "F:\\abaqus_temp\\qingping\\_work\\zhu_radius_20261017\\qa\\desktop-custom-kf.pdf",
+    "size": 508986
+  },
+  "longTable": {
+    "file": "F:\\abaqus_temp\\qingping\\_work\\zhu_radius_20261017\\qa\\desktop-long-table.pdf",
+    "size": 590800
+  },
+  "rendererErrors": [],
+  "externalRequests": [],
+  "verifiedAt": "2026-10-17T09:07:35.827Z"
+}

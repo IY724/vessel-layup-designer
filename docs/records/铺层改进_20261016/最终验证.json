@@ -1,0 +1,33 @@
+{
+  "source": "vessel-layup-designer",
+  "version": "V1.0",
+  "files": [
+    {
+      "name": "气瓶铺层设计软件-网页版.html",
+      "bytes": 1612881,
+      "sha256": "82a5a7c9368d5afb32cf866291996d259d27c331500b6c9a3e2e12a63868c27d"
+    },
+    {
+      "name": "气瓶铺层设计-1.0-Windows-x64-安装包.exe",
+      "bytes": 111753445,
+      "sha256": "83b11390e3e59fa49b29637103457ae276a93016c599191ccb025f1b371dce1c"
+    },
+    {
+      "name": "气瓶铺层设计-1.0-Windows-x64-免安装.exe",
+      "bytes": 111578849,
+      "sha256": "b2d0e209e7b6d0cfb997894e3b00d65317decfeaa9ec4ec86a74d46d1d2c8490"
+    },
+    {
+      "name": "案例-A自动生成.xlsx",
+      "bytes": 706626,
+      "sha256": "2adef8c3b41290bac1bc09e6c78fb1de9a2c1ff342b8c65b3d12b1422daf902b"
+    }
+  ],
+  "checks": {
+    "unitTests": 101,
+    "webUi": 16,
+    "desktopUi": 16,
+    "recalculatedFormulaCells": 17634,
+    "releaseIdentity": 13
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "mode": "web-http",
+  "executablePath": null,
+  "defaultLayupOrder": [
+    [
+      15,
+      8
+    ],
+    [
+      90,
+      8
+    ],
+    [
+      20,
+      8
+    ],
+    [
+      90,
+      8
+    ],
+    [
+      25,
+      4
+    ],
+    [
+      90,
+      4
+    ],
+    [
+      35,
+      4
+    ],
+    [
+      90,
+      4
+    ],
+    [
+      40,
+      4
+    ],
+    [
+      90,
+      12
+    ]
+  ],
+  "legacyDefaultMigrated": true,
+  "pageCount": 17,
+  "default": {
+    "file": "F:\\abaqus_temp\\qingping\\_work\\zhu_radius_20261017\\qa\\web-http-default.pdf",
+    "size": 509141
+  },
+  "customKf": {
+    "file": "F:\\abaqus_temp\\qingping\\_work\\zhu_radius_20261017\\qa\\web-http-custom-kf.pdf",
+    "size": 508988
+  },
+  "longTable": {
+    "file": "F:\\abaqus_temp\\qingping\\_work\\zhu_radius_20261017\\qa\\web-http-long-table.pdf",
+    "size": 590796
+  },
+  "rendererErrors": [],
+  "externalRequests": [],
+  "verifiedAt": "2026-10-17T09:07:28.302Z"
+}

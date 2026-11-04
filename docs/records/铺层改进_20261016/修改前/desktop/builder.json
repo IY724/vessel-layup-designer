@@ -1,0 +1,32 @@
+{
+  "appId": "cn.vessel.layup.designer",
+  "productName": "气瓶铺层设计",
+  "directories": { "output": "release", "buildResources": "desktop" },
+  "files": ["dist/**/*", "desktop/main.cjs", "desktop/icon.png", "package.json", "!node_modules/**/*"],
+  "asar": true,
+  "electronDist": "node_modules/electron/dist",
+  "npmRebuild": false,
+  "compression": "maximum",
+  "win": {
+    "icon": "desktop/icon.ico",
+    "executableName": "VesselLayupDesigner",
+    "target": ["nsis", "portable"]
+  },
+  "nsis": {
+    "artifactName": "气瓶铺层设计-1.0-Windows-x64-安装包.${ext}",
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "气瓶铺层设计",
+    "runAfterFinish": false,
+    "deleteAppDataOnUninstall": false,
+    "installerLanguages": ["zh_CN", "en_US"],
+    "language": "2052"
+  },
+  "portable": {
+    "artifactName": "气瓶铺层设计-1.0-Windows-x64-免安装.${ext}",
+    "requestExecutionLevel": "user"
+  }
+}
