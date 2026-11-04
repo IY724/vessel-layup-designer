@@ -13,7 +13,7 @@
     "target": ["nsis", "portable"]
   },
   "nsis": {
-    "artifactName": "复合材料气瓶缠绕铺层设计软件-1.0-Windows-x64-安装包.${ext}",
+    "artifactName": "气瓶铺层设计-1.0-Windows-x64-安装包.${ext}",
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
@@ -26,7 +26,7 @@
     "language": "2052"
   },
   "portable": {
-    "artifactName": "复合材料气瓶缠绕铺层设计软件-1.0-Windows-x64-免安装.${ext}",
+    "artifactName": "气瓶铺层设计-1.0-Windows-x64-免安装.${ext}",
     "requestExecutionLevel": "user"
   }
 }
