@@ -9,6 +9,7 @@ import ExcelJS from 'exceljs'
 
 const root=fileURLToPath(new URL('../',import.meta.url))
 const out=path.resolve(root,'output/grid-sync')
+await fs.mkdir(out,{recursive:true})
 const {version:packageVersion}=JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8'))
 const version=packageVersion.split('.').slice(0,2).join('.')  // 对外标识：1.0.0 → 1.0
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex')
@@ -20,7 +21,8 @@ assert.equal(JSON.parse(await fs.readFile(path.join(root,siteName),'utf8')).inde
 const files=[]
 for(const name of ['案例-0参考铺层.xlsx','案例-A自动生成.xlsx','案例-B定稿.xlsx']){
   const wb=new ExcelJS.Workbook()
-  await wb.xlsx.load(await fs.readFile(path.join(root,'../交付',name)))
+  // 案例表由 design_case/export_cases_browser 现算现出，落在 output/design_case，不再随交付目录分发
+  await wb.xlsx.load(await fs.readFile(path.join(root,'output/design_case',name)))
   for(const ws of wb.worksheets){
     assert.ok(ws.views.length>0&&ws.views.every(v=>v.showGridLines===true),`${name} / ${ws.name} 网格线`)
     ws.eachRow(row=>row.eachCell({includeEmpty:true},cell=>{
@@ -29,7 +31,8 @@ for(const name of ['案例-0参考铺层.xlsx','案例-A自动生成.xlsx','案�
     const blank=ws.getCell('Z2000')
     assert.ok(!blank.fill||blank.fill.pattern==='none',`${ws.name} 空白区域填充`)
   }
-  const sample=wb.getWorksheet('封头-10°').getCell('A41')
+  // 封头分片表名随默认算例的角度变化，按首个「封头-角度°」表抽检数据格样式
+  const sample=wb.worksheets.find((ws)=>/^封头-[\d.]+°$/.test(ws.name)).getCell('A41')
   assert.equal(sample.fill.pattern,'none')
   for(const edge of ['top','bottom','left','right'])assert.equal(sample.border[edge].style,'thin')
   files.push({name,sheetsWithGridLines:wb.worksheets.length,whiteCellFills:0})

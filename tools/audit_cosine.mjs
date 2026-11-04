@@ -25,5 +25,6 @@ const result={sha256:crypto.createHash('sha256').update(bytes).digest('hex'),
  probeAngles:[0,10,45,60,90].map(deg=>{const u=deg*Math.PI/180;return{deg,originalFactor:Math.cos(u*Math.cos(u)),squaredFactor:Math.cos(u)**2}}),
  points:[30.2,81,163,173.5].map(r=>data.find(p=>p.r===r)),
  maximumDifference:{r:max.r,original:max.original,squaredLocal:max.squaredLocal,difference:max.original-max.squaredLocal}}
-fs.writeFileSync('../_公式核查_20261015/余弦项数值核查.json',JSON.stringify(result,null,2))
+fs.mkdirSync('output/qa/cosine-audit',{recursive:true})
+fs.writeFileSync('output/qa/cosine-audit/余弦项数值核查.json',JSON.stringify(result,null,2))
 console.log(JSON.stringify({...result,points:result.points.map(({groups,...point})=>point)},null,2))

@@ -16,7 +16,8 @@ const browser = app ? null : await chromium.launch({ ...(process.env.PDF_QA_BROW
 const page = app ? await app.firstWindow() : await browser.newPage({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true })
 const errors = [], requests = []
 page.on('pageerror', error => errors.push(error.message))
-page.on('request', req => { if (/^https?:/.test(req.url()) && req.url() !== webUrl) requests.push(req.url()) })
+const sameOrigin = (url) => url.replace(/\/$/, '') === webUrl.replace(/\/$/, '')
+page.on('request', req => { if (/^https?:/.test(req.url()) && !sameOrigin(req.url())) requests.push(req.url()) })
 const mode = app ? 'desktop' : webUrl.startsWith('file:') ? 'web' : 'web-http'
 try {
   if (!app) await page.goto(webUrl)
@@ -45,7 +46,8 @@ try {
   const generated=await readPlan()
   assert.equal(generated.length,10)
   generated.forEach((g,i)=>assert.equal(g[0],i%2?90:expectedDefault[i][0]))
-  assert.equal(generated.filter((_,i)=>i%2===0).reduce((s,g)=>s+g[1],0),20)
+  // 初估 20 层是均分结果；纵向欠强后自动补 4 层，填入 24 层
+  assert.equal(generated.filter((_,i)=>i%2===0).reduce((s,g)=>s+g[1],0),24)
   assert.equal(generated.filter((_,i)=>i%2===1).reduce((s,g)=>s+g[1],0),35)
   await page.getByRole('button',{name:'恢复默认',exact:true}).click()
   assert.deepEqual(await readPlan(),expectedDefault)
